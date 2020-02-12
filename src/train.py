@@ -65,9 +65,10 @@ while iteration < n_iterations:
         labels = labels.type(torch.LongTensor)
 
         optimizer.zero_grad() 
-
         inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
                 eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, alpha=learning_rate, train=True)
+        optimizer.zero_grad()
+        model.zero_grad()
         labels_estimations = model(inputs_adv)
         loss = criterion(labels_estimations, labels)
         loss.backward()
