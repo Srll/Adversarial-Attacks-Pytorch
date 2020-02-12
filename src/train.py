@@ -26,7 +26,11 @@ params_to_update = []
 for name,param in model.named_parameters():
     if param.requires_grad == True:
         params_to_update.append(param)
-optimizer = torch.optim.Adam(params_to_update, lr=0.001)
+learning_rate = args.learning_rate
+if args.adversarial_training_algorithm == 'FGSM_vanilla':
+    optimizer = torch.optim.Adam(params_to_update, lr=learning_rate)
+else: 
+    optimizer = torch.optim.Adam(params_to_update, lr=1.0)
 
 # prepare the losses and iterations
 n_iterations = args.n_iterations 
@@ -63,7 +67,7 @@ while iteration < n_iterations:
         optimizer.zero_grad() 
 
         inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
-                eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, train=True)
+                eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, alpha=learning_rate, train=True)
         labels_estimations = model(inputs_adv)
         loss = criterion(labels_estimations, labels)
         loss.backward()

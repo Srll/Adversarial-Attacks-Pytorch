@@ -155,14 +155,14 @@ def get_args_train():
         help = 'number of training iterations') 
     parser.add_argument('--batch_size', type = int, default = 32, 
         help = 'number of samples in each batch')
-    parser.add_argument('--learning_rate', type = float, default = 0.001, 
+    parser.add_argument('--learning_rate', type = float, default = 0.03, 
         help = 'learning rate of the training algorithm (Adam)')
     parser.add_argument('--verbose_rate', type = int, default = 250, 
         help = 'number of iterations to show preliminar results and store the model')
     
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM', 'IFGSM', 'fast', 'free'
+            'none', 'FGSM_vanilla', 'PGD', 'FGSM', 'free'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -171,6 +171,8 @@ def get_args_train():
         help = 'minimum value of the input variable')
     parser.add_argument('--max_value_input', type = float, default = 1.0, 
         help = 'maximum value of the input variable')
+    parser.add_argument('--n_steps_adv', type = int, default = 7, 
+        help = 'number of steps for the iterative adversarial algorithms')
 
     return parser.parse_args()
 
