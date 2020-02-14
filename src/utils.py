@@ -3,11 +3,38 @@ import torch, torchvision
 import numpy as np 
 from skimage import io as skio
 from skimage import transform as sktransform
+from scipy.io.wavfile import read as wavread
 import argparse
+import os.path
 
 #####################
 #   Dataset Utils   #
 #####################
+def create_speech_commands_dataset_atlas(directory, force=False):
+    ''' http://download.tensorflow.org/data/speech_commands_v0.01.tar.gz '''
+    
+    
+    if not os.path.isfile(os.path.join(directory,'audio_atlas.pkl')):
+
+        paths = {'train': list(), 'validation': list()}
+        
+        for class_name in os.listdir(directory):
+            folder_name = os.path.join(directory, class_name)
+            path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
+
+            paths['train'] += path_names[:int(len(path_names)*0.85)]
+            paths['validation'] += path_names[int(len(path_names)*0.85):]
+        
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
+            pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
+        
+    if not os.path.isfile(os.path.join(image_directory,'name_to_label.pkl')):
+        name_to_label = {'yes':0, 'no':1, 'up':2, 'down':3, 'left':4, 'right':5, 'on':6, 'off':7, 'stop':8, 'go':9}
+        with open(os.path.join(image_directory,'name_to_label.pkl'), 'wb') as file:
+            pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
+
+
+
 
 def create_dogs_cats_dataset_atlas(image_directory, force=False):
 
@@ -36,7 +63,7 @@ def create_imagenet_dataset_atlas(image_directory):
 
     ''' Downloaded using https://github.com/mf1024/ImageNet-Datasets-Downloader with command:
             $ python3 downloader.py -data_root ../Datasets/imagenet -use_class_list True \
-                -class_list n01484850, n02007558, n07753592, n07745940, n02051845, n02129604 \
+                -class_list n01484850 n02007558 n07753592 n07745940 n02051845 n02129604 \
                 -images_per_class 2000
     '''
 
@@ -57,7 +84,40 @@ def create_imagenet_dataset_atlas(image_directory):
         with open(os.path.join(image_directory,'name_to_label.pkl'), 'wb') as file:
             pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
 
+
+class SpeechCommandDataset(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas(directory)
+        with open(os.path.join(image_directory,'audio_atlas.pkl'), 'rb') as file:
+            self.image_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(image_directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split('/')[-2]] for v in self.image_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go'] 
+        self.input_size = input_size
+        print(self.input_size)
+        
+
+    def __len__(self):
+        return len(self.labels)
     
+    def __getitem__(self, idx):
+
+        image_path = self.image_paths[idx]
+        fs, audio = wavread(image_path) 
+        # preprocess()
+        audio = audio[0:100] # 100 first samples
+        
+        label = self.labels[idx]
+        return image, label
+
+
+
+
 class DogsCatsDataset(torch.utils.data.Dataset):
 
     def __init__(self, image_directory, input_size, train=True, transform=None, force=False):
@@ -91,10 +151,13 @@ class SelectedImagenetDataset(torch.utils.data.Dataset):
             self.image_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
         with open(os.path.join(image_directory,'name_to_label.pkl'), 'rb') as file:
             name_to_label = pickle.load(file)
-        
+
         self.labels = [name_to_label[v.split('/')[-2]] for v in self.image_paths]
+        
         self.labels_name = ['great white shark', 'flamingo', 'banana', 'strawberry', 'pelican', 'tiger']
         self.input_size = input_size
+        print(self.input_size)
+        
 
     def __len__(self):
 
@@ -119,6 +182,8 @@ class SelectedImagenetDataset(torch.utils.data.Dataset):
 
 def get_dataset(dataset_name, dataset_path, input_size = 224, train = True):
 
+    if dataset_name == 'speech':
+        return SpeechCommandDataset(dataset_path, input_size, train)
     if dataset_name == 'dogscats':
         return DogsCatsDataset(dataset_path, input_size, train)
     elif dataset_name == 'imagenet':
@@ -145,7 +210,7 @@ def get_args_train():
         help = 'folder to store the models') 
     parser.add_argument('--datasets_dir', default = '../Datasets/',
         help = 'folder where the datasets are stored') 
-    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet'], default = 'imagenet', 
+    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
             'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18'

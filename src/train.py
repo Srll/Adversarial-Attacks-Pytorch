@@ -38,7 +38,7 @@ n_iterations_show = args.verbose_rate
 running_loss = 0
 running_accuracy = 0
 iteration = 0
-bar = progressbar.ProgressBar(max_value=n_iterations_show)
+bar = progressbar.ProgressBar(max_value=100)
 
 # load the checkpoint, if any 
 checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
@@ -58,27 +58,31 @@ adversary = adversaries.AdversarialGenerator(model,criterion)
 
 # train the model
 while iteration < n_iterations:
-
     for _, (inputs,labels) in enumerate(dataloader_train):
         
         inputs = inputs.type(torch.FloatTensor)
         labels = labels.type(torch.LongTensor)
-
+        
         optimizer.zero_grad() 
         inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
                 eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, alpha=learning_rate, train=True)
         optimizer.zero_grad()
+        
         model.zero_grad()
         labels_estimations = model(inputs_adv)
         loss = criterion(labels_estimations, labels)
         loss.backward()
         optimizer.step()
+        
 
         # Show statistics and percentage
         with torch.no_grad():
             running_loss += loss.item()
             running_accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
             bar.update(iteration % n_iterations_show)
+
+
+
             if iteration % n_iterations_show == n_iterations_show-1:
                 bar = progressbar.ProgressBar(max_value=n_iterations_show)
                 loss_eval = 0.0
@@ -90,6 +94,7 @@ while iteration < n_iterations:
                         labels_estimations = model(inputs)
                         loss_eval += criterion(labels_estimations, labels)
                         accuracy_eval += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
+                
                 print(f'Loss at iteration {iteration+1} -> train: {running_loss/n_iterations_show:.3f} | eval: {loss_eval/len(dataloader_eval):.3f}')
                 print(f'Accuracy at iteration {iteration+1} -> train: {running_accuracy/n_iterations_show:.3f} | eval: {accuracy_eval/len(dataloader_eval):.3f}')
                 torch.save({

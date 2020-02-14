@@ -2,3 +2,5 @@
 Datasets/*
 Models/*
 Figures/*
+venv/*
+src/__pycache__/*

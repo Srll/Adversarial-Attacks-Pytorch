@@ -1,6 +1,13 @@
 import torch, torchvision
 import os
 
+# use http instead of https
+import torchvision.models
+from torchvision.models.shufflenetv2 import model_urls
+
+model_urls['shufflenetv2_x0.5'] = model_urls['shufflenetv2_x0.5'].replace('https://', 'http://')
+
+
 class CNN(torch.nn.Module):
 
     def __init__(self, network_type, dataset_name):
@@ -8,10 +15,13 @@ class CNN(torch.nn.Module):
         super(CNN, self).__init__() 
         self.network_type = network_type
 
-        if dataset_name == 'dogscats':
+        if dataset_name == 'speech':
+            classes = 10
+        elif dataset_name == 'dogscats':
             classes = 2 
         elif dataset_name == 'imagenet':
             classes = 6
+        
 
         if self.network_type == 'images_resnet18':
             self.model = torchvision.models.resnet18()
