@@ -1,11 +1,12 @@
 import numpy as np
 import librosa as lr
-
+from scipy import signal
 from matplotlib import pyplot as plt
 
 def zeropad(x, length):
-    """ Zeropads last dimension to have size = length
-    
+    """ if len(x)<length: Zeropads last dimension to have size = length
+        else: return x[0:length]
+
     Arguments:
         x {ndarray} -- [description]
         length {int} -- [description]
@@ -24,11 +25,11 @@ def zeropad(x, length):
         
     return x_padded
 
-def filter_lowpass(x, cutoff):
-    
-
-def filter(x, cutoff):
-    return None
+def filter_lowpass(x, cutoff_khz, fs):
+    w = 2*cutoff_khz/fs
+    b, a = signal.butter(3, w)
+    y = signal.filtfilt(b, a, x)
+    return y
 
 def spectrogram(x):
     x_float = x.astype(np.float32)
