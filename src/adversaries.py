@@ -27,20 +27,22 @@ class AdversarialGenerator(object):
 
     
     def generate_adversarial_ONE_PIXEL(self, x, y, x_min=-1, x_max=1, targeted=False, train=False):
+        # TODO add reduce computational complexity of algorithm, reduce amount of comparissons
+        # TODO add support for targetted attacks
+        # TODO accept sparsity as a parameter, ie how many "pixels" should be altered
+
         x_np = x.numpy()
-        
-        B = x.shape[0]      # Batch size
-        data_dims = len(x.shape) - 2 # subtract Batch and RGB dimensions
-        max_idx = np.min(x.shape[2:]) - 1
-        
-        I = 400             # Iterations of algorithm
+        B = x.shape[0]                      # Batch size
+        data_dims = len(x.shape) - 2        # subtract Batch and RGB dimensions
+        max_idx = np.min(x.shape[2:]) - 1   # Only supports square area of perturbations
+        I = 400                             # Iterations of algorithm
 
         
-        parents_pos = np.random.randint(0,max_idx,(B,I,data_dims+1))            # position values (int)
+        parents_pos = np.random.randint(0,max_idx,(B,I,data_dims+1))    # position values (int)
         for b in range(B):
             parents_pos[b,:,0] = b
 
-        parents_rgb = np.random.uniform(x_min, x_max, (B,I, x.shape[1]))    # pixel values (float)
+        parents_rgb = np.random.uniform(x_min, x_max, (B,I, x.shape[1])) # pixel values (float)
 
         def evolve(p_pos, p_rgb, F=0.5):
             #p_pos = [B, 400, 2]
@@ -62,60 +64,40 @@ class AdversarialGenerator(object):
             #img = [B, 3, max_x, max_y]
             #perturbation = [B, 400, 2]
             
-            #[[b.extend(idxs)] for idxs in x_pos[:,:]]
             img = np.moveaxis(img, 1, -1)
-            
-
             img[p_pos[:,i,0], p_pos[:,i,1], p_pos[:,i,2]] = p_rgb[:,i,:]
-            
-            #img = np.expand_dims(img, axis=0) 
             img = np.moveaxis(img, -1, 1)
-            
             img = torch.from_numpy(img)
-            
             return img.to(torch.float32) # set type float32
             
-
-        
         
         for _ in range(100): # iterations of DE
-            children_pos, children_rgb = evolve(parents_pos, parents_rgb) # (B, 400,5)
-                
+            children_pos, children_rgb = evolve(parents_pos, parents_rgb)    
             for i in range(I):
                 children_p = add_perturbation(x_np, children_pos, parents_rgb,i)
                 parents_p = add_perturbation(x_np, parents_pos, parents_rgb,i)
-
-
                 with torch.no_grad():
                     fitness_new = self.model(children_p)
                     fitness_old = self.model(parents_p)
-                
-
 
                 if targeted:
                     None
                 else:
                     idxs = np.nonzero(np.diag(fitness_new.numpy()[:,y] < fitness_old.numpy()[:,y]))
-                    
-                    #import pdb
-                    #pdb.set_trace()
                     parents_pos[idxs,i,:] = children_pos[idxs,i,:]
-                    parents_rgb[idxs,i,:] = children_rgb[idxs,i,:]
+                    parents_rgb[idxs,i,:] = children_rgb[idxs,i,:]        
         
-        #x_adv = add_perturbation(x_img, parents[0,:])
+        # TODO add logic to return best perturbation
+        x_adv = add_perturbation(x_np, parents_pos, )
 
-        
-        #if train:
-        return x_adv
-        
-        
-        y_estimate = self.model(x_torch)
-        y_estimate_adversarial = self.model(x_adv)
-        
+        if train:
+            return x_adv
+
+        with torch.no_grad():
+            y_estimate_adversarial = self.model(x_adv)
+            y_estimate = self.model(x_)
         noise = x_adv - x_torch
-
         return x_adv, noise, y_estimate_adversarial, y_estimate
-    
 
     def generate_adversarial_FGSM_vanilla(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, train = False):
 
