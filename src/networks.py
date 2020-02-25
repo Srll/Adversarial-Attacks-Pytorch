@@ -49,21 +49,17 @@ class audio_conv(nn.Module):
 class Simple_dense(torch.nn.Module):
     def __init__(self,classes):
         super(Simple_dense, self).__init__()
-        
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(784, 1000)
         self.fc2 = nn.Linear(1000,512)
         self.fc3 = nn.Linear(512, 128)
         self.fc4 = nn.Linear(128,classes)
-        self.relu1 = nn.ReLU()
-        self.relu2 = nn.ReLU()
-        self.relu3 = nn.ReLU()
-          
+    
     def forward(self, x):
         x = self.flatten(x)
-        x = self.relu1(self.fc1(x))
-        x = self.relu2(self.fc2(x))
-        x = self.relu3(self.fc3(x))
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.relu(self.fc3(x))
         x = self.fc4(x)
 
         return x
@@ -74,8 +70,7 @@ class CNN(torch.nn.Module):
 
         super(CNN, self).__init__() 
         self.network_type = network_type
-        self.softmax = nn.Softmax(dim=-1)
-
+        
 
         if dataset_name == 'speech':
             classes = 10

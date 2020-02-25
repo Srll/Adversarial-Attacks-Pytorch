@@ -9,6 +9,9 @@ import os
 
 torch.manual_seed(1)
 
+criterion = None
+adversary = None
+figures_path = None
 # obtain the arguments 
 args = utils.get_args_evaluate()
 
@@ -38,6 +41,8 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     if targeted:
         target_name = labels_name[target_id]
     
+    # TODO fix
+    input_type = 'images'
     if input_type == 'images':
         save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
             path=figures_path, target_name=target_name)
@@ -59,7 +64,7 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
 
     
 def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
-
+    """
     def paint_images(im, correct):
         im = torch.nn.functional.pad(im,pad=(10,10,10,10),mode='constant',value=0)
         im[correct,1,0:10] = 1.0
@@ -71,7 +76,22 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
         im[~correct,0,:,0:10] = 1.0
         im[~correct,0,:,-10:-1] = 1.0
         return im
-
+    """
+    
+    
+    def paint_images(im, correct):
+        im = torch.nn.functional.pad(im,pad=(10,10,10,10),mode='constant',value=0)
+        im[correct,0,0:10] = 0.0
+        im[correct,0,-10:-1] = 0.0
+        im[correct,0,:,0:10] = 0.0
+        im[correct,0,:,-10:-1] = 0.0
+        im[~correct,0,0:10] = 1.0
+        im[~correct,0,-10:-1] = 1.0
+        im[~correct,0,:,0:10] = 1.0
+        im[~correct,0,:,-10:-1] = 1.0
+        return im
+    
+    
     correct = y.eq(torch.max(y_est,dim=1)[1])
     correct_adv = y.eq(torch.max(y_est_adv,dim=1)[1])
     x = paint_images(x, correct)
@@ -102,34 +122,43 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
     plt.savefig(os.path.join(path,body + 'resulting_image' + tail + '.png'),format='png')
 
 
-# obtain the model and the datasets
-dataset_path = args.datasets_dir + args.dataset_name 
-models_path = args.models_dir + args.dataset_name 
-figures_path = args.images_dir + args.dataset_name
-model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
-dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
-dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True)
-dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
-dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True)
-labels_name = dataset_eval.labels_name
 
-# obtain the criterion used for training 
-criterion = torch.nn.CrossEntropyLoss()
+def evaluate():
+    # obtain the model and the datasets
+    dataset_path = args.datasets_dir + args.dataset_name 
+    models_path = args.models_dir + args.dataset_name 
+    global figures_path
+    figures_path = args.images_dir + args.dataset_name
+    model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
+    dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
+    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True)
+    dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
+    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True)
+    labels_name = dataset_eval.labels_name
 
-# load the checkpoint, if any 
-checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
-if os.path.isfile(checkpoint_path):  
-    checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    iteration = checkpoint['iteration'] + 1
-    print(f'Model trained with {iteration} iterations')
-    print(f'Loss at iteration {iteration} -> train: {checkpoint["training_loss"]:.3f} | eval: {checkpoint["evaluation_loss"]:.3f}')
-    print(f'Accuracy at iteration {iteration} -> train: {checkpoint["training_accuracy"]:.3f} | eval: {checkpoint["evaluation_accuracy"]:3f}')
+    # obtain the criterion used for training 
+    global criterion
+    criterion = torch.nn.CrossEntropyLoss()
 
-# generate the adversary
-adversary = adversaries.AdversarialGenerator(model,criterion)
+    # load the checkpoint, if any 
+    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
+    if os.path.isfile(checkpoint_path):  
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        iteration = checkpoint['iteration'] + 1
+        print(f'Model trained with {iteration} iterations')
+        print(f'Loss at iteration {iteration} -> train: {checkpoint["training_loss"]:.3f} | eval: {checkpoint["evaluation_loss"]:.3f}')
+        print(f'Accuracy at iteration {iteration} -> train: {checkpoint["training_accuracy"]:.3f} | eval: {checkpoint["evaluation_accuracy"]:3f}')
 
-# evaluate the model 
-input_type = args.model_name.split('_')[0]
-evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
-evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
+    # generate the adversary
+    #global adversary
+    adversary = adversaries.AdversarialGenerator(model,criterion)
+
+
+    # evaluate the model 
+    input_type = args.model_name.split('_')[0]
+    evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
+    #evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
+
+if __name__ == "__main__":
+    evaluate()

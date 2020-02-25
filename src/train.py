@@ -16,6 +16,9 @@ def train():
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name 
     models_path = args.models_dir + args.dataset_name 
+    #if args.model_name == "simple_dense":
+    #    model = networks.Simple_dense(10)
+    #else:
     model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
     dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
@@ -27,12 +30,15 @@ def train():
     params_to_update = []
     for name,param in model.named_parameters():
         if param.requires_grad == True:
+            print(name)
             params_to_update.append(param)
     learning_rate = args.learning_rate
+    
     if args.adversarial_training_algorithm == 'FGSM_vanilla':
         optimizer = torch.optim.Adam(params_to_update, lr=learning_rate)
     else: 
-        optimizer = torch.optim.Adam(params_to_update, lr=1.0)
+        #optimizer = torch.optim.SGD(params_to_update, lr=0.01,momentum=0.5)
+        optimizer = torch.optim.Adam(params_to_update, lr=0.01)
 
     # prepare the losses and iterations
     n_iterations = args.n_iterations 
@@ -57,7 +63,7 @@ def train():
 
     # prepare adversary
     adversary = adversaries.AdversarialGenerator(model,criterion)
-
+    bar = progressbar.ProgressBar(max_value=n_iterations_show)
     # train the model
     while iteration < n_iterations:
         for _, (inputs,labels) in enumerate(dataloader_train):
@@ -65,7 +71,7 @@ def train():
             inputs = inputs.type(torch.FloatTensor)
             labels = labels.type(torch.LongTensor)
             
-            optimizer.zero_grad() 
+            optimizer.zero_grad()
             inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
                     eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, alpha=learning_rate, train=True)
             optimizer.zero_grad()
@@ -74,7 +80,11 @@ def train():
             labels_estimations = model(inputs_adv)
             loss = criterion(labels_estimations, labels)
             loss.backward()
+            #print(loss.grad)
+            #print(model)
+            #print(model.fc1.weight.grad) 
             optimizer.step()
+            
             
 
             # Show statistics and percentage
@@ -82,8 +92,9 @@ def train():
                 running_loss += loss.item()
                 running_accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
                 bar.update(iteration % n_iterations_show)
+                #bar.update(int(100 * i / n_iterations_show))
                 if iteration % n_iterations_show == n_iterations_show-1:
-                    bar = progressbar.ProgressBar(max_value=n_iterations_show)
+                    
                     loss_eval = 0.0
                     accuracy_eval = 0.0
                     print('\nEvaluating...')

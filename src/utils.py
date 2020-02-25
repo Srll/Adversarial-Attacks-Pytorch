@@ -50,9 +50,10 @@ def create_mnist_dataset_atlas(directory, force=False):
         for class_name in os.listdir(directory):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
-            paths['train'] += path_names[:int(len(path_names)*0.85)]
-            paths['validation'] += path_names[int(len(path_names)*0.85):]
-        
+            paths['train'] += path_names[:int(len(path_names)*0.99)]
+            paths['validation'] += path_names[int(len(path_names)*0.99):]
+            print(class_name)
+
         with open(os.path.join(directory,'mnist_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
         
@@ -155,6 +156,7 @@ class MnistDataset(torch.utils.data.Dataset):
             name_to_label = pickle.load(file)
 
         self.labels = [name_to_label[v.split(slash)[-2]] for v in self.image_paths]
+        
         self.labels_name = ['0','1','2','3','4','5','6','7','8','9']
         self.input_size = input_size
 
@@ -324,11 +326,11 @@ def get_args_evaluate():
     
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM', 'IFGSM', 'fast', 'free'
+            'none', 'FGSM', 'IFGSM', 'fast', 'free','ONE_PIXEL'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM', 'IFGSM', 'fast', 'free'
+            'none', 'FGSM', 'IFGSM', 'fast', 'free','ONE_PIXEL'
         ], default = 'FGSM',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
