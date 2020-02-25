@@ -6,15 +6,13 @@ from skimage import transform as sktransform
 from scipy.io.wavfile import read as wavread
 import argparse
 import os.path
+#import audio_utils 
 
 # Check if filesystem is Unix or Windows
 if '/src' in os.path.dirname(os.path.realpath(__file__)):
     slash = '/'
 elif '\\src' in os.path.dirname(os.path.realpath(__file__)):
     slash = '\\'
-    
-
-
 
 #####################
 #   Dataset Utils   #
@@ -42,7 +40,27 @@ def create_speech_commands_dataset_atlas(directory, force=False):
         with open(os.path.join(directory,'name_to_label.pkl'), 'wb') as file:
             pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
 
-
+def create_mnist_dataset_atlas(directory, force=False):
+    
+    
+    if not os.path.isfile(os.path.join(directory,'mnist_atlas.pkl')):
+        
+        paths = {'train': list(), 'validation': list()}
+        
+        for class_name in os.listdir(directory):
+            folder_name = os.path.join(directory, class_name)
+            path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
+            paths['train'] += path_names[:int(len(path_names)*0.85)]
+            paths['validation'] += path_names[int(len(path_names)*0.85):]
+        
+        with open(os.path.join(directory,'mnist_atlas.pkl'), 'wb') as file:
+            pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
+        
+    if not os.path.isfile(os.path.join(directory,'name_to_label.pkl')):
+        name_to_label = {'0':0, '1':1, '2':2, '3':3, '4':4, '5':5, '6':6, '7':7, '8':8, '9':9}
+        with open(os.path.join(directory,'name_to_label.pkl'), 'wb') as file:
+            pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
+    
 
 
 def create_dogs_cats_dataset_atlas(image_directory, force=False):
@@ -106,7 +124,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 
         self.labels = [name_to_label[v.split(slash)[-2]] for v in self.audio_paths]
         
-        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go'] 
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
         self.input_size = input_size
         
         
@@ -119,13 +137,38 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         audio_path = self.audio_paths[idx]
         fs, audio = wavread(audio_path) 
         # preprocess()
-        audio = audio[0:100] # 100 first samples
+        audio = audio_utils.zeropad(audio, 8000) 
+        spectrogram = audio_utils.spectrogram(audio)
         
         label = self.labels[idx]
         return audio, label
 
+class MnistDataset(torch.utils.data.Dataset):
 
+    def __init__(self, image_directory, input_size, train=True, transform=None, force=False):
+        #torchvision.datasets.MNIST(image_directory + slash + "mnist", download=True)
 
+        create_mnist_dataset_atlas(image_directory)
+        with open(os.path.join(image_directory,'mnist_atlas.pkl'), 'rb') as file:
+            self.image_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(image_directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(slash)[-2]] for v in self.image_paths]
+        self.labels_name = ['0','1','2','3','4','5','6','7','8','9']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        image_path = self.image_paths[idx]
+        image = skio.imread(image_path)
+        image = sktransform.resize(image, (self.input_size, self.input_size))
+        
+        image = np.expand_dims(image, axis=0)
+        label = self.labels[idx]
+        return image, label
 
 class DogsCatsDataset(torch.utils.data.Dataset):
 
@@ -180,23 +223,26 @@ class SelectedImagenetDataset(torch.utils.data.Dataset):
         if len(image.shape) != 3 or image.shape[2] == 1:
             image = image.reshape(self.input_size, self.input_size)
             image_new = np.empty((self.input_size, self.input_size, 3))
-            image_new[:,:,0] = image / 0.3 
-            image_new[:,:,1] = image / 0.59 
+            image_new[:,:,0] = image / 0.3
+            image_new[:,:,1] = image / 0.59
             image_new[:,:,2] = image / 0.11
             image = image_new
-            
+        
         image = np.swapaxes(np.swapaxes(image,0,2),1,2)
         label = self.labels[idx]
+        
         return image, label
 
-def get_dataset(dataset_name, dataset_path, input_size = 224, train = True):
+def get_dataset(dataset_name, dataset_path, input_size = 28, train = True):
 
     if dataset_name == 'speech':
         return SpeechCommandDataset(dataset_path, input_size, train)
-    if dataset_name == 'dogscats':
+    elif dataset_name == 'dogscats':
         return DogsCatsDataset(dataset_path, input_size, train)
     elif dataset_name == 'imagenet':
         return SelectedImagenetDataset(dataset_path, input_size, train)
+    elif dataset_name == 'mnist':
+        return MnistDataset(dataset_path, input_size, train)
 
 #####################
 #   Parsing utils   #
@@ -219,10 +265,10 @@ def get_args_train():
         help = 'folder to store the models') 
     parser.add_argument('--datasets_dir', default = '..'+slash+'Datasets'+slash,
         help = 'folder where the datasets are stored') 
-    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech'], default = 'imagenet', 
+    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--n_iterations', type = int, default = 2000, 
@@ -236,7 +282,7 @@ def get_args_train():
     
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'FGSM', 'free'
+            'none', 'FGSM_vanilla', 'ONE_PIXEL','PGD', 'FGSM', 'free'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -267,10 +313,10 @@ def get_args_evaluate():
         help = 'folder to store the models') 
     parser.add_argument('--datasets_dir', default = '..'+slash+'Datasets'+slash,
         help = 'folder where the datasets are stored') 
-    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet'], default = 'imagenet', 
+    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw','simple_dense'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 
@@ -298,4 +344,4 @@ def get_args_evaluate():
 
 
 
-        
+
