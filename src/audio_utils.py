@@ -33,14 +33,12 @@ def filter_lowpass(x, cutoff_khz, fs):
 
 def spectrogram(x):
     x_float = x.astype(np.float32)
-
-    s = np.abs(lr.stft(x_float, n_fft=256, hop_length=64, window='hann'))
-    
+    s1 = np.abs(lr.stft(x_float, n_fft=256, hop_length=64, window='hann'))
+    #s2 = np.abs(signal.stft(x_float, nfft=256, noverlap=256-64, window='hann'))
 
     #plt.imshow(s.T, cmap='BuPu')
     #plt.show()
-    
-    return s.astype(x.dtype)
+    return s1.astype(x.dtype)
 
 
 #def inverse_spectrogram(x):
