@@ -15,7 +15,7 @@ figures_path = None
 # obtain the arguments 
 args = utils.get_args_evaluate()
 
-def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, target_id=0, input_type = 'images'):
+def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, target_id=3, input_type = 'images'):
 
     accuracy = 0 
     accuracy_adversarial = 0
@@ -64,8 +64,19 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
 
     
 def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
-    """
+
     def paint_images(im, correct):
+        # convert to rgb
+        if im.shape[1] == 1:
+            
+            im_new = torch.zeros((im.shape[0],)+(3,)+(im.shape[2:]))
+            
+            im = torch.squeeze(im)
+            im_new[:,0,:,:] = im / 0.3
+            im_new[:,1,:,:] = im / 0.59
+            im_new[:,2,:,:] = im / 0.11
+            im = im_new
+
         im = torch.nn.functional.pad(im,pad=(10,10,10,10),mode='constant',value=0)
         im[correct,1,0:10] = 1.0
         im[correct,1,-10:-1] = 1.0
@@ -76,21 +87,6 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
         im[~correct,0,:,0:10] = 1.0
         im[~correct,0,:,-10:-1] = 1.0
         return im
-    """
-    
-    
-    def paint_images(im, correct):
-        im = torch.nn.functional.pad(im,pad=(10,10,10,10),mode='constant',value=0)
-        im[correct,0,0:10] = 0.0
-        im[correct,0,-10:-1] = 0.0
-        im[correct,0,:,0:10] = 0.0
-        im[correct,0,:,-10:-1] = 0.0
-        im[~correct,0,0:10] = 1.0
-        im[~correct,0,-10:-1] = 1.0
-        im[~correct,0,:,0:10] = 1.0
-        im[~correct,0,:,-10:-1] = 1.0
-        return im
-    
     
     correct = y.eq(torch.max(y_est,dim=1)[1])
     correct_adv = y.eq(torch.max(y_est_adv,dim=1)[1])
@@ -158,7 +154,7 @@ def evaluate():
     # evaluate the model 
     input_type = args.model_name.split('_')[0]
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
-    #evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
+    evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
 
 if __name__ == "__main__":
     evaluate()

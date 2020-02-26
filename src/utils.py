@@ -284,7 +284,7 @@ def get_args_train():
     
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'ONE_PIXEL','PGD', 'FGSM', 'free'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -326,12 +326,12 @@ def get_args_evaluate():
     
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM', 'IFGSM', 'fast', 'free','ONE_PIXEL'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM', 'IFGSM', 'fast', 'free','ONE_PIXEL'
-        ], default = 'FGSM',
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
+        ], default = 'FGSM_vanilla',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
         help = 'strength of the linear perturbation of the adversarial')

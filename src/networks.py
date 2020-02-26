@@ -51,16 +51,19 @@ class Simple_dense(torch.nn.Module):
         super(Simple_dense, self).__init__()
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(784, 1000)
-        self.fc2 = nn.Linear(1000,512)
-        self.fc3 = nn.Linear(512, 128)
-        self.fc4 = nn.Linear(128,classes)
+        self.fc2 = nn.Linear(1000,800)
+        self.fc3 = nn.Linear(800,512)
+        self.fc4 = nn.Linear(512, 128)
+        self.fc5 = nn.Linear(128,classes)
     
     def forward(self, x):
         x = self.flatten(x)
         x = F.relu(self.fc1(x))
         x = F.relu(self.fc2(x))
         x = F.relu(self.fc3(x))
-        x = self.fc4(x)
+        x = F.relu(self.fc4(x))
+        x = self.fc5(x)
+        
 
         return x
 
