@@ -51,7 +51,7 @@ class AdversarialGenerator(object):
             img = img.copy()
             for b, i in enumerate(idxs.tolist()):
                 img[p_pos[b,i,0], :, p_pos[b,i,1], p_pos[b,i,2]] = p_rgb[b,i,:]
-            return torch.from_numpy(img).to(torch.float32)
+            return torch.from_numpy(img).to(torch.float32) 
 
         def add_perturbation(img0, p_pos, p_rgb, i):
             #img = [B, 3, max_x, max_y]

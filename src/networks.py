@@ -2,6 +2,7 @@ import torch, torchvision
 import os
 import torch.nn as nn
 import torch.nn.functional as F
+import preprocess
 
 
 # use http instead of https
@@ -50,8 +51,8 @@ class Simple_dense(torch.nn.Module):
     def __init__(self,classes):
         super(Simple_dense, self).__init__()
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(784, 1000)
-        self.fc2 = nn.Linear(1000,800)
+        self.fc1 = nn.Linear(16254, 3000)
+        self.fc2 = nn.Linear(3000,800)
         self.fc3 = nn.Linear(800,512)
         self.fc4 = nn.Linear(512, 128)
         self.fc5 = nn.Linear(128,classes)
@@ -63,17 +64,15 @@ class Simple_dense(torch.nn.Module):
         x = F.relu(self.fc3(x))
         x = F.relu(self.fc4(x))
         x = self.fc5(x)
-        
-
         return x
 
 class CNN(torch.nn.Module):
 
-    def __init__(self, network_type, dataset_name):
+    def __init__(self, network_type, dataset_name, preprocess_sequence):
 
         super(CNN, self).__init__() 
         self.network_type = network_type
-        
+        self.preprocess = preprocess.PreProcess(preprocess_sequence)
 
         if dataset_name == 'speech':
             classes = 10
@@ -98,8 +97,13 @@ class CNN(torch.nn.Module):
             self.model = TheModelClass(classes)
         elif self.network_type == 'simple_dense':
             self.model = Simple_dense(classes)
-            
+    
+    #def pre(self, x):
+        
     
     def forward(self, x):
-        
+        x = self.preprocess.forward(x)
         return self.model(x)
+
+
+

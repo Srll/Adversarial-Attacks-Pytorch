@@ -6,7 +6,7 @@ from skimage import transform as sktransform
 from scipy.io.wavfile import read as wavread
 import argparse
 import os.path
-#import audio_utils 
+import audio_utils 
 
 # Check if filesystem is Unix or Windows
 if '/src' in os.path.dirname(os.path.realpath(__file__)):
@@ -29,8 +29,8 @@ def create_speech_commands_dataset_atlas(directory, force=False):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
 
-            paths['train'] += path_names[:int(len(path_names)*0.85)]
-            paths['validation'] += path_names[int(len(path_names)*0.85):]
+            paths['train'] += path_names[:int(len(path_names)*0.99)]
+            paths['validation'] += path_names[int(len(path_names)*0.99):]
         
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -62,8 +62,6 @@ def create_mnist_dataset_atlas(directory, force=False):
         with open(os.path.join(directory,'name_to_label.pkl'), 'wb') as file:
             pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
     
-
-
 def create_dogs_cats_dataset_atlas(image_directory, force=False):
 
     ''' Downloaded from https://www.kaggle.com/lingjin525/dogs-and-cats-fastai '''
@@ -138,9 +136,14 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         audio_path = self.audio_paths[idx]
         fs, audio = wavread(audio_path) 
         # preprocess()
-        audio = audio_utils.zeropad(audio, 8000) 
-        spectrogram = audio_utils.spectrogram(audio)
+        audio = audio.astype(np.float32)
         
+        audio = audio_utils.zeropad(audio, 8000)
+        
+        #spectrogram = audio_utils.spectrogram(audio)
+        #spectrogram = spectrogram / np.max(spectrogram)
+        #spectrogram = np.expand_dims(spectrogram, axis=0)
+        # spectrogram_rgb = convert_to_rgb(spectrogram)
         label = self.labels[idx]
         return audio, label
 
@@ -246,6 +249,23 @@ def get_dataset(dataset_name, dataset_path, input_size = 28, train = True):
     elif dataset_name == 'mnist':
         return MnistDataset(dataset_path, input_size, train)
 
+def convert_to_rgb(im):
+    dims = len(im.shape)
+    im = np.squeeze(im)
+    if dims == 4:
+        im_new = np.zeros((im.shape[0],)+(3,)+(im.shape[1:]))
+        im_new[:,0] = im / 0.3
+        im_new[:,1] = im / 0.59
+        im_new[:,2] = im / 0.11
+    elif dims == 3:
+        im_new = np.zeros((3,)+(im.shape[0:]))
+        im_new[0] = im / 0.3
+        im_new[1] = im / 0.59
+        im_new[2] = im / 0.11
+    else:
+        print("Not supported size for RGB conversion")
+    return im_new
+
 #####################
 #   Parsing utils   #
 #####################
@@ -282,6 +302,19 @@ def get_args_train():
     parser.add_argument('--verbose_rate', type = int, default = 250, 
         help = 'number of iterations to show preliminar results and store the model')
     
+    # Preprocessing parsing
+    """
+    parser.add_argument('--preprocess_lowpass', type = int, default = 4000, 
+        help = 'cutoff frequency for lowpass filter (Hz)')
+    parser.add_argument('--preprocess_spectrogram', type = bool, default = False, 
+        help = 'use spectrogram as input to classifier')
+    parser.add_argument('--preprocess_MFCC', type = bool, default = False, 
+        help = 'use MFCC as input to classifier')
+    """
+    parser.add_argument('--preprocess_sequence', nargs='+', type = str, default = 'None', 
+        help = 'sequence of preprocessing steps')
+    
+
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
             'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
@@ -295,6 +328,8 @@ def get_args_train():
         help = 'maximum value of the input variable')
     parser.add_argument('--n_steps_adv', type = int, default = 7, 
         help = 'number of steps for the iterative adversarial algorithms')
+
+    
 
     return parser.parse_args()
 

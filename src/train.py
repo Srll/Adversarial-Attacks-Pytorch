@@ -5,6 +5,7 @@ import networks
 import progressbar
 import adversaries
 import os
+import preprocess
 
 torch.manual_seed(1)
 
@@ -19,7 +20,8 @@ def train():
     #if args.model_name == "simple_dense":
     #    model = networks.Simple_dense(10)
     #else:
-    model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
+    
+    model = networks.CNN(args.model_name,dataset_name=args.dataset_name,preprocess_sequence=args.preprocess_sequence)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
     dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
@@ -116,6 +118,8 @@ def train():
                         'training_accuracy': running_accuracy/n_iterations_show,
                         'evaluation_accuracy': accuracy_eval/len(dataloader_eval)
                         }, checkpoint_path)
+
+                    
                     running_loss = 0.0
                     running_accuracy = 0.0
 
