@@ -381,8 +381,13 @@ def get_args_evaluate():
     return parser.parse_args()
 
 
-def simple_hash(x):
+def simple_hash(words):
+    letter_to_int = {'a':5, 'd':9 , 'r': 27, '_':2}
     y = 0
-    for i, t in enumerate(x):
-        y += (len(t)*(i + 7)) * 137
+    for i, word in enumerate(words):
+        for letter in word:
+            if letter in letter_to_int:
+                y += letter_to_int[letter]
+        y += (len(word)*(i + 7)) * 137
+    y = y % 9999
     return str(y)

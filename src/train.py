@@ -68,6 +68,7 @@ def train():
 
     # prepare adversary
     adversary = adversaries.AdversarialGenerator(model,criterion)
+    
     bar = progressbar.ProgressBar(max_value=n_iterations_show)
     # train the model
     while iteration < n_iterations:
@@ -79,6 +80,7 @@ def train():
             optimizer.zero_grad()
             inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
                     eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, alpha=learning_rate, train=True)
+            
             optimizer.zero_grad()
             
             model.zero_grad()
@@ -89,7 +91,6 @@ def train():
             #print(model)
             #print(model.fc1.weight.grad) 
             optimizer.step()
-            
             
 
             # Show statistics and percentage

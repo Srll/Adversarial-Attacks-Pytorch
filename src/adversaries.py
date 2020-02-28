@@ -7,19 +7,19 @@ class AdversarialGenerator(object):
 
         super(AdversarialGenerator,self).__init__()
         
-        self.model = model 
+        self.model = model
         self.criterion = criterion 
         
     
     def generate_adversarial(self, adversarial_type, x, target, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.03, n_steps = 7, train = False, target_id=3):
 
         if train:
+            
             if adversarial_type == 'none': 
                 return x
             else:
                 z = self.model.preprocess.forward(x)
-            
-        
+                
             if adversarial_type == 'FGSM_vanilla':
                 z_adv = self.generate_adversarial_FGSM_vanilla(z, target, targeted, eps, x_min, x_max, train)
             elif adversarial_type == 'PGD':
@@ -31,7 +31,6 @@ class AdversarialGenerator(object):
             elif adversarial_type == 'fast':
                 print('Not yet implemente')
             return self.model.preprocess.inverse(z_adv)
-        
         else: # evaluate
             if adversarial_type == 'none': 
                 return x, torch.zeros_like(x), self.model(x), self.model(x)
@@ -89,11 +88,12 @@ class AdversarialGenerator(object):
             #return np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True).T
             return (np.exp(x).T / np.sum(np.exp(x), axis=1)).T
 
+
         x_np = x.numpy()
         B = x.shape[0]                      # Batch size
         data_dims = len(x.shape) - 2        # subtract Batch and RGB dimensions
         max_idx = np.min(x.shape[2:]) - 1   # Only supports square area of perturbations
-        I = 50                              # Iterations of algorithm
+        I = 3                               # Iterations of algorithm
         
         parents_pos = np.random.randint(0,max_idx,(B,I,data_dims+1))    # position values (int)
         for b in range(B):
@@ -101,15 +101,16 @@ class AdversarialGenerator(object):
 
         parents_rgb = np.random.uniform(x_min, x_max, (B,I, x.shape[1])) # pixel values (float)
 
-        for _ in range(25): # iterations of DE
+        for _ in range(2): # iterations of DE
             children_pos, children_rgb = evolve(parents_pos, parents_rgb)
             for i in range(I):
                 children_p = add_perturbation(x_np, children_pos, children_rgb,i)
                 parents_p = add_perturbation(x_np, parents_pos, parents_rgb,i)
 
                 with torch.no_grad():
-                    y_new = softmax(self.model(children_p).numpy())
-                    y_old = softmax(self.model(parents_p).numpy())
+                    y_new = softmax(self.model.model(children_p).numpy()/100000)
+                    y_old = softmax(self.model.model(parents_p).numpy()/100000)
+                
 
                 if targeted == False:
                     idxs = np.nonzero(np.diag(y_new[:,y]) < np.diag(y_old[:,y]))
@@ -119,18 +120,15 @@ class AdversarialGenerator(object):
                 
                 parents_pos[idxs,i,:] = children_pos[idxs,i,:]
                 parents_rgb[idxs,i,:] = children_rgb[idxs,i,:]
-            print(str(y_old[0,y[0]]))
-            
-
 
         y_pred = np.zeros((B,I))
         for i in range(I):
             parents_p = add_perturbation(x_np, parents_pos, parents_rgb,i)
             with torch.no_grad():
                 if targeted == False:
-                    y_pred[:,i] = np.diag(self.model(parents_p).numpy()[:,y])
+                    y_pred[:,i] = np.diag(self.model.model(parents_p).numpy()[:,y])
                 else:
-                    y_pred[:,i] = np.diag(self.model(parents_p).numpy()[:,y])
+                    y_pred[:,i] = np.diag(self.model.model(parents_p).numpy()[:,y])
 
         idx = np.argmax(y_pred, axis=1)
         x_adv = add_perturbation_batch(x_np, parents_pos, parents_rgb, idx)
@@ -138,15 +136,15 @@ class AdversarialGenerator(object):
         if train:
             return x_adv
         with torch.no_grad():
-            y_estimate_adversarial = self.model(x_adv)
-            y_estimate = self.model(x)
+            y_estimate_adversarial = self.model.model(x_adv)
+            y_estimate = self.model.model(x)
         noise = x_adv - x
         return x_adv.to(torch.float32), noise.to(torch.float32), y_estimate_adversarial.to(torch.float32), y_estimate.to(torch.float32)
 
     def generate_adversarial_FGSM_vanilla(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, train = False):
         
         x_adv = torch.autograd.Variable(x.data, requires_grad=True)
-        y_estimate = self.model(x_adv)
+        y_estimate = self.model.model(x_adv)
         if targeted:
             loss = self.criterion(y_estimate,y) 
         else: 
@@ -165,7 +163,7 @@ class AdversarialGenerator(object):
             return x_adv 
 
         with torch.no_grad():
-            y_estimate_adversarial = self.model(x_adv)
+            y_estimate_adversarial = self.model.model(x_adv)
 
         return x_adv, noise, y_estimate_adversarial, y_estimate
     
@@ -174,7 +172,7 @@ class AdversarialGenerator(object):
         delta = torch.rand_like(x) * (2.0 * eps) - eps # could also be initialized to 0
         for j in range(n_steps):
             delta = torch.autograd.Variable(delta, requires_grad = True)
-            y_estimate = self.model(x + delta) 
+            y_estimate = self.model.model(x + delta) 
             if targeted: 
                 loss = self.criterion(y_estimate, y)
             else: 
@@ -196,8 +194,8 @@ class AdversarialGenerator(object):
         
         
         with torch.no_grad(): 
-            y_estimate = self.model(x)
-            y_estimate_adversarial = self.model(x_adv) 
+            y_estimate = self.model.model(x)
+            y_estimate_adversarial = self.model.model(x_adv) 
         
         
         return x_adv, delta, y_estimate_adversarial, y_estimate

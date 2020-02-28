@@ -51,7 +51,7 @@ class Simple_dense(torch.nn.Module):
     def __init__(self,classes):
         super(Simple_dense, self).__init__()
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(16254, 3000)
+        self.fc1 = nn.Linear(48762, 3000)
         self.fc2 = nn.Linear(3000,800)
         self.fc3 = nn.Linear(800,512)
         self.fc4 = nn.Linear(512, 128)
@@ -72,9 +72,8 @@ class CNN(torch.nn.Module):
 
         super(CNN, self).__init__() 
         self.network_type = network_type
-        #self.preprocess_sequence = preprocess_sequence
         self.preprocess = preprocess.PreProcess(preprocess_sequence)
-        #self.register_buffer('preprocess_sequence', torch.tensor([1,2,3,4], requires_grad=False))
+        
 
         if dataset_name == 'speech':
             classes = 10
@@ -102,10 +101,7 @@ class CNN(torch.nn.Module):
     
     #def pre(self, x):
         
-    
     def forward(self, x):
         x = self.preprocess.forward(x)
         return self.model(x)
-
-
 
