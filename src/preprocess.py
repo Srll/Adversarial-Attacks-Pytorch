@@ -3,7 +3,7 @@ import numpy as np
 from scipy import signal
 import torch
 import matplotlib.pyplot as plt 
-
+# TODO add MFCC, MelSPECTROGRAM, delta calculations for MFCC
 
 
 class PreProcess():
@@ -23,8 +23,8 @@ class PreProcess():
         #self.kwargs = kwargs
     
         # TODO make it possible to specify these through CLI
-        self.kwargs =  {'coeffs_denominator' : signal.butter(20,500,btype='low',fs=8000)[1],
-                        'coeffs_numerator' : signal.butter(20,500,btype='low',fs=8000)[0], 
+        self.kwargs =  {'coeffs_denominator' : signal.butter(6,5000,btype='low',fs=16000)[1],
+                        'coeffs_numerator' : signal.butter(6,5000,btype='low',fs=16000)[0], 
                         'stft_n_fft':256,}
 
 

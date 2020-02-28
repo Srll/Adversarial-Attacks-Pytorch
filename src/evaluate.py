@@ -9,6 +9,7 @@ import os
 
 torch.manual_seed(1)
 
+
 criterion = None
 adversary = None
 figures_path = None
@@ -138,7 +139,7 @@ def evaluate():
     criterion = torch.nn.CrossEntropyLoss()
 
     # load the checkpoint, if any 
-    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
+    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocess_sequence) + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
         model.preprocess = checkpoint['preprocessing_sequence']

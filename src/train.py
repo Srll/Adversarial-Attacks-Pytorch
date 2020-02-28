@@ -7,7 +7,7 @@ import adversaries
 import os
 import preprocess
 
-# TODO when saving model, make sure to generate unique filename based on preprocessing sequence  (maybe through hash function)
+
 
 torch.manual_seed(1)
 
@@ -53,7 +53,7 @@ def train():
     bar = progressbar.ProgressBar(max_value=100)
 
     # load the checkpoint, if any 
-    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
+    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocess_sequence) + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
         model.preprocess = checkpoint['preprocessing_sequence']

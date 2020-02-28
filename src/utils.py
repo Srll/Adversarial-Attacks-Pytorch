@@ -135,6 +135,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 
         audio_path = self.audio_paths[idx]
         fs, audio = wavread(audio_path) 
+        
         # preprocess()
         audio = audio.astype(np.float32)
         
@@ -380,5 +381,8 @@ def get_args_evaluate():
     return parser.parse_args()
 
 
-
-
+def simple_hash(x):
+    y = 0
+    for i, t in enumerate(x):
+        y += (len(t)*(i + 7)) * 137
+    return str(y)
