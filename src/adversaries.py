@@ -6,33 +6,56 @@ class AdversarialGenerator(object):
     def __init__(self, model, criterion):
 
         super(AdversarialGenerator,self).__init__()
+        
         self.model = model 
         self.criterion = criterion 
+        
     
     def generate_adversarial(self, adversarial_type, x, target, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.03, n_steps = 7, train = False, target_id=3):
 
-        if adversarial_type == 'none':
-            if train:
+        if train:
+            if adversarial_type == 'none': 
                 return x
             else:
+                z = self.model.preprocess.forward(x)
+            
+        
+            if adversarial_type == 'FGSM_vanilla':
+                z_adv = self.generate_adversarial_FGSM_vanilla(z, target, targeted, eps, x_min, x_max, train)
+            elif adversarial_type == 'PGD':
+                z_adv = self.generate_adversarial_PGD(z, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
+            elif adversarial_type == 'ONE_PIXEL':
+                z_adv = self.generate_adversarial_ONE_PIXEL(z, target, targeted, x_min, x_max, train)
+            elif adversarial_type == 'free':
+                print('Not yet implemented')
+            elif adversarial_type == 'fast':
+                print('Not yet implemente')
+            return self.model.preprocess.inverse(z_adv)
+        
+        else: # evaluate
+            if adversarial_type == 'none': 
                 return x, torch.zeros_like(x), self.model(x), self.model(x)
-        elif adversarial_type == 'FGSM_vanilla':
-            return self.generate_adversarial_FGSM_vanilla(x, target, targeted, eps, x_min, x_max, train)
-        elif adversarial_type == 'PGD':
-            return self.generate_adversarial_PGD(x, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
-        elif adversarial_type == 'ONE_PIXEL':
-            return self.generate_adversarial_ONE_PIXEL(x, target, targeted, x_min, x_max, train)
-        elif adversarial_type == 'free':
-            print('Not yet implemented')
-        elif adversarial_type == 'fast':
-            print('Not yet implemented')
-        input("didnt find any")
+            else:
+                z = self.model.preprocess.forward(x)
+
+
+            if adversarial_type == 'FGSM_vanilla':
+                z_adv, z_delta, y_estimate_adv, y_estimate = self.generate_adversarial_FGSM_vanilla(z, target, targeted, eps, x_min, x_max, train)
+            elif adversarial_type == 'PGD':
+                z_adv, z_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_PGD(z, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
+            elif adversarial_type == 'ONE_PIXEL':
+                z_adv, z_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_ONE_PIXEL(z, target, targeted, x_min, x_max, train)
+            elif adversarial_type == 'free':
+                print('Not yet implemented')
+            elif adversarial_type == 'fast':
+                print('Not yet implemente')
+            return self.model.preprocess.inverse(z_adv), self.model.preprocess.inverse(z_delta), y_estimate_adv, y_estimate
 
     
     def generate_adversarial_ONE_PIXEL(self, x, y, targeted=False, x_min=-1, x_max=1, train=False, nr_of_pixels=1):
         # TODO add reduce computational complexity of algorithm, reduce amount of comparissons
         # TODO accept sparsity as a parameter, ie how many "pixels" should be altered
-
+        
         def evolve(p_pos, p_rgb, F=0.5):
             #p_pos = [B, 400, 2]
             c_pos = np.copy(p_pos)
@@ -121,7 +144,7 @@ class AdversarialGenerator(object):
         return x_adv.to(torch.float32), noise.to(torch.float32), y_estimate_adversarial.to(torch.float32), y_estimate.to(torch.float32)
 
     def generate_adversarial_FGSM_vanilla(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, train = False):
-
+        
         x_adv = torch.autograd.Variable(x.data, requires_grad=True)
         y_estimate = self.model(x_adv)
         if targeted:

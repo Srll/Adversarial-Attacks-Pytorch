@@ -72,7 +72,9 @@ class CNN(torch.nn.Module):
 
         super(CNN, self).__init__() 
         self.network_type = network_type
+        #self.preprocess_sequence = preprocess_sequence
         self.preprocess = preprocess.PreProcess(preprocess_sequence)
+        #self.register_buffer('preprocess_sequence', torch.tensor([1,2,3,4], requires_grad=False))
 
         if dataset_name == 'speech':
             classes = 10

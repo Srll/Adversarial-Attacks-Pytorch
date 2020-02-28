@@ -123,6 +123,7 @@ def evaluate():
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name 
     models_path = args.models_dir + args.dataset_name 
+    #preprocess_path = args.model_dir + args.preprocess_sequence
     global figures_path
     figures_path = args.images_dir + args.dataset_name
     model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
@@ -140,6 +141,7 @@ def evaluate():
     checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
+        model.preprocess = checkpoint['preprocessing_sequence']
         model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
         print(f'Model trained with {iteration} iterations')

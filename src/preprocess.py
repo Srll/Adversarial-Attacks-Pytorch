@@ -12,7 +12,7 @@ class PreProcess():
         
         valid_transforms = {'None': (self.dummy, self.dummy),
                             'stft': (self.stft, self.istft),
-                            'filter_IIR': (self.filt, self.ifilt), 
+                            'filter': (self.filt, self.ifilt), 
                             'spectrogram':(self.spectrogram, self.ispectrogram),
                             'mag2db':(self.mag2db, self.db2mag),
                             'insert_rgb_dim': (self.push_rgb_dim, self.pop_rgb_dim),
@@ -20,22 +20,24 @@ class PreProcess():
                             'dbg': (self.dbg, self.dbg)}
                             #'normalize': (self.normalize, self.inormalize))
 
-        #self.kwargs = kwargs 
+        #self.kwargs = kwargs
+    
         # TODO make it possible to specify these through CLI
-        self.kwargs =  {'coeffs_denominator' : np.array([1,0.0]),
-                        'coeffs_numerator' : np.array([1,0.0]), 
+        self.kwargs =  {'coeffs_denominator' : signal.butter(20,500,btype='low',fs=8000)[1],
+                        'coeffs_numerator' : signal.butter(20,500,btype='low',fs=8000)[0], 
                         'stft_n_fft':256,}
 
-        self.phi = None     # stores angle of stft, needed for inverse spectrogram
+
+        # stores values from forward pass that are needed during the inverse pass
+        self.phi = None     # stores angle of stft
         self.x_shape = None # stores size of x
 
         self.transforms_forward = list()
         self.transforms_inverse = list()
-        #self.transforms = transforms
         for transform in transforms:
-            self.transforms_forward.append(valid_transforms[transform][0])
-            self.transforms_inverse.append(valid_transforms[transform][1])
-
+            self.transforms_forward.append(valid_transforms[transform][0]) # add all forward transforms to forward list
+            self.transforms_inverse.append(valid_transforms[transform][1]) # add their corresponding "inverse" to inverse list
+        self.transforms_inverse.reverse() 
 
     def forward(self, x):
         x = x.numpy()
@@ -59,17 +61,18 @@ class PreProcess():
     def mag2db(self, x):
         #TODO fix divison by 0
         return 20 * np.log10(x+0.0001)
-
     def db2mag(self, x):
         return np.power(10, x/20)
 
     def filt(self, x):
+        #TODO change lfilter method to scipy recomended method (faster)
         y = x.copy()
         for b in range(x.shape[0]):
             y[b, :] = signal.lfilter(self.kwargs.get('coeffs_numerator'), self.kwargs.get('coeffs_denominator'), x[b,:])[:]
         return y
 
     def ifilt(self, x):
+        #TODO change lfilter method to scipy recomended method (faster)
         y = x.copy()
         for b in range(x.shape[0]):
             y[b, :] = signal.lfilter(self.kwargs.get('coeffs_denominator'), self.kwargs.get('coeffs_numerator'), x[b,:])[:]

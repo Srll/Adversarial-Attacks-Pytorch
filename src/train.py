@@ -7,6 +7,8 @@ import adversaries
 import os
 import preprocess
 
+# TODO when saving model, make sure to generate unique filename based on preprocessing sequence  (maybe through hash function)
+
 torch.manual_seed(1)
 
 def train():
@@ -54,6 +56,7 @@ def train():
     checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
+        model.preprocess = checkpoint['preprocessing_sequence']
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         iteration = checkpoint['iteration'] + 1
@@ -109,7 +112,9 @@ def train():
                     
                     print(f'Loss at iteration {iteration+1} -> train: {running_loss/n_iterations_show:.3f} | eval: {loss_eval/len(dataloader_eval):.3f}')
                     print(f'Accuracy at iteration {iteration+1} -> train: {running_accuracy/n_iterations_show:.3f} | eval: {accuracy_eval/len(dataloader_eval):.3f}')
+
                     torch.save({
+                        'preprocessing_sequence': model.preprocess,
                         'iteration': iteration,
                         'model_state_dict': model.state_dict(), 
                         'optimizer_state_dict': optimizer.state_dict(),
