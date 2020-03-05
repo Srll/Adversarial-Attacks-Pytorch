@@ -282,7 +282,7 @@ def get_args_train():
     )
 
     # Standard parsing
-    parser.add_argument('--images_dir', default = '..'+slash+''+'Figures'+slash,
+    parser.add_argument('--images_dir', default = '..'+slash+'Figures'+slash,
         help = 'folder to store the resulting images')
     parser.add_argument('--models_dir', default = '..'+slash+'Models'+slash,
         help = 'folder to store the models') 
@@ -291,7 +291,7 @@ def get_args_train():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_cdnn'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--n_iterations', type = int, default = 2000, 
@@ -354,7 +354,7 @@ def get_args_evaluate():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw','simple_dense'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_cdnn'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 

@@ -3,7 +3,7 @@ import numpy as np
 from scipy import signal
 import torch
 import matplotlib.pyplot as plt 
-# TODO add MFCC, MelSPECTROGRAM, delta calculations for MFCC
+# TODO add MFCC, MelSPECTROGRAM, delta calculations for MFCC, quantization, bandpass
 
 
 class PreProcess():
