@@ -1,60 +1,55 @@
 import torch
 import numpy as np
+import preprocess
 
 class AdversarialGenerator(object):
 
-    def __init__(self, model, criterion):
+    def __init__(self, model, criterion, preprocess_sequence):
 
         super(AdversarialGenerator,self).__init__()
-        
         self.model = model
         self.criterion = criterion 
-        
+        self.adversarial_preprocess = preprocess.PreProcess(preprocess_sequence)
     
     def generate_adversarial(self, adversarial_type, x, target, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.03, n_steps = 7, train = False, target_id=3):
 
         if train:
-            
-            if adversarial_type == 'none': 
+            if adversarial_type == 'none':
                 return x
-            else:
-                z = self.model.preprocess.forward(x)
-                
-            if adversarial_type == 'FGSM_vanilla':
-                z_adv = self.generate_adversarial_FGSM_vanilla(z, target, targeted, eps, x_min, x_max, train)
+            elif adversarial_type == 'FGSM_vanilla':
+                x_adv = self.generate_adversarial_FGSM_vanilla(x, target, targeted, eps, x_min, x_max, train)
             elif adversarial_type == 'PGD':
-                z_adv = self.generate_adversarial_PGD(z, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
+                x_adv = self.generate_adversarial_PGD(x, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
             elif adversarial_type == 'ONE_PIXEL':
-                z_adv = self.generate_adversarial_ONE_PIXEL(z, target, targeted, x_min, x_max, train)
+                x_adv = self.generate_adversarial_ONE_PIXEL(x, target, targeted, x_min, x_max, train)
             elif adversarial_type == 'free':
                 print('Not yet implemented')
             elif adversarial_type == 'fast':
-                print('Not yet implemente')
-            return self.model.preprocess.inverse(z_adv)
+                print('Not yet implemented')
+            return x_adv
+
         else: # evaluate
-            if adversarial_type == 'none': 
+            if adversarial_type == 'none':
                 return x, torch.zeros_like(x), self.model(x), self.model(x)
-            else:
-                z = self.model.preprocess.forward(x)
-
-
-            if adversarial_type == 'FGSM_vanilla':
-                z_adv, z_delta, y_estimate_adv, y_estimate = self.generate_adversarial_FGSM_vanilla(z, target, targeted, eps, x_min, x_max, train)
+            elif adversarial_type == 'FGSM_vanilla':
+                x_adv, x_delta, y_estimate_adv, y_estimate = self.generate_adversarial_FGSM_vanilla(x, target, targeted, eps, x_min, x_max, train)
             elif adversarial_type == 'PGD':
-                z_adv, z_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_PGD(z, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
+                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_PGD(x, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
             elif adversarial_type == 'ONE_PIXEL':
-                z_adv, z_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_ONE_PIXEL(z, target, targeted, x_min, x_max, train)
+                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_ONE_PIXEL(x, target, targeted, x_min, x_max, train)
             elif adversarial_type == 'free':
                 print('Not yet implemented')
             elif adversarial_type == 'fast':
                 print('Not yet implemente')
-            return self.model.preprocess.inverse(z_adv), self.model.preprocess.inverse(z_delta), y_estimate_adv, y_estimate
+            return x_adv, x_delta, y_estimate_adv, y_estimate
 
     
     def generate_adversarial_ONE_PIXEL(self, x, y, targeted=False, x_min=-1, x_max=1, train=False, nr_of_pixels=1):
         # TODO add reduce computational complexity of algorithm, reduce amount of comparissons
         # TODO accept sparsity as a parameter, ie how many "pixels" should be altered
-        
+        x_old = x
+        x = self.adversarial_preprocess.forward(x)
+
         def evolve(p_pos, p_rgb, F=0.5):
             #p_pos = [B, 400, 2]
             c_pos = np.copy(p_pos)
@@ -73,7 +68,7 @@ class AdversarialGenerator(object):
             img = img.copy()
             for b, i in enumerate(idxs.tolist()):
                 img[p_pos[b,i,0], :, p_pos[b,i,1], p_pos[b,i,2]] = p_rgb[b,i,:]
-            return torch.from_numpy(img).to(torch.float32) 
+            return torch.from_numpy(img).to(torch.float32)
 
         def add_perturbation(img0, p_pos, p_rgb, i):
             #img = [B, 3, max_x, max_y]
@@ -84,16 +79,13 @@ class AdversarialGenerator(object):
             return img.to(torch.float32) # set type float32
         
         def softmax(x):
-            """Compute softmax values for each sets of scores in x."""
-            #return np.exp(x) / np.sum(np.exp(x), axis=1, keepdims=True).T
             return (np.exp(x).T / np.sum(np.exp(x), axis=1)).T
-
 
         x_np = x.numpy()
         B = x.shape[0]                      # Batch size
         data_dims = len(x.shape) - 2        # subtract Batch and RGB dimensions
         max_idx = np.min(x.shape[2:]) - 1   # Only supports square area of perturbations
-        I = 3                               # Iterations of algorithm
+        I = 5                               # Iterations of algorithm
         
         parents_pos = np.random.randint(0,max_idx,(B,I,data_dims+1))    # position values (int)
         for b in range(B):
@@ -101,22 +93,26 @@ class AdversarialGenerator(object):
 
         parents_rgb = np.random.uniform(x_min, x_max, (B,I, x.shape[1])) # pixel values (float)
 
-        for _ in range(2): # iterations of DE
+        for _ in range(4): # iterations of DE
             children_pos, children_rgb = evolve(parents_pos, parents_rgb)
             for i in range(I):
+                
                 children_p = add_perturbation(x_np, children_pos, children_rgb,i)
                 parents_p = add_perturbation(x_np, parents_pos, parents_rgb,i)
+                
 
                 with torch.no_grad():
-                    y_new = softmax(self.model.model(children_p).numpy()/100000)
-                    y_old = softmax(self.model.model(parents_p).numpy()/100000)
-                
+                    children_p = self.adversarial_preprocess.inverse(children_p)
+                    parents_p = self.adversarial_preprocess.inverse(parents_p)
+                    y_new = softmax(self.model(children_p).numpy()/100000)
+                    y_old = softmax(self.model(parents_p).numpy()/100000)
 
                 if targeted == False:
                     idxs = np.nonzero(np.diag(y_new[:,y]) < np.diag(y_old[:,y]))
-                    #print(idxs[0].shape)
+                    print(idxs)
                 else:
                     idxs = np.nonzero(np.diag(y_new[:,y]) > np.diag(y_old[:,y]))
+                    
                 
                 parents_pos[idxs,i,:] = children_pos[idxs,i,:]
                 parents_rgb[idxs,i,:] = children_rgb[idxs,i,:]
@@ -124,27 +120,33 @@ class AdversarialGenerator(object):
         y_pred = np.zeros((B,I))
         for i in range(I):
             parents_p = add_perturbation(x_np, parents_pos, parents_rgb,i)
+            parents_p = self.adversarial_preprocess.inverse(parents_p)
             with torch.no_grad():
                 if targeted == False:
-                    y_pred[:,i] = np.diag(self.model.model(parents_p).numpy()[:,y])
+                    y_pred[:,i] = np.diag(self.model(parents_p).numpy()[:,y])
                 else:
-                    y_pred[:,i] = np.diag(self.model.model(parents_p).numpy()[:,y])
+                    y_pred[:,i] = np.diag(self.model(parents_p).numpy()[:,y])
 
         idx = np.argmax(y_pred, axis=1)
-        x_adv = add_perturbation_batch(x_np, parents_pos, parents_rgb, idx)
+        z_adv = add_perturbation_batch(x_np, parents_pos, parents_rgb, idx)
+        x_adv = self.adversarial_preprocess.inverse(z_adv)
+        
 
         if train:
             return x_adv
+
         with torch.no_grad():
-            y_estimate_adversarial = self.model.model(x_adv)
-            y_estimate = self.model.model(x)
-        noise = x_adv - x
+            
+            y_estimate_adversarial = self.model(x_adv)
+            y_estimate = self.model(x_old.to(torch.float32))
+        noise = x_adv - x_old
+        
         return x_adv.to(torch.float32), noise.to(torch.float32), y_estimate_adversarial.to(torch.float32), y_estimate.to(torch.float32)
 
     def generate_adversarial_FGSM_vanilla(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, train = False):
         
         x_adv = torch.autograd.Variable(x.data, requires_grad=True)
-        y_estimate = self.model.model(x_adv)
+        y_estimate = self.model(x_adv)
         if targeted:
             loss = self.criterion(y_estimate,y) 
         else: 

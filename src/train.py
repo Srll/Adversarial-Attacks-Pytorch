@@ -23,11 +23,11 @@ def train():
     #    model = networks.Simple_dense(10)
     #else:
     
-    model = networks.CNN(args.model_name,dataset_name=args.dataset_name,preprocess_sequence=args.preprocess_sequence)
+    model = networks.CNN(args.model_name,dataset_name=args.dataset_name,preprocess_sequence=args.preprocessing_model_sequence)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
-    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
+    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=6, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
-    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
+    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=6, drop_last=True)
 
     # prepare the optimization  
     criterion = torch.nn.CrossEntropyLoss()
@@ -53,7 +53,7 @@ def train():
     bar = progressbar.ProgressBar(max_value=100)
 
     # load the checkpoint, if any 
-    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocess_sequence) + '.chkpt')
+    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocessing_model_sequence) + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
         model.preprocess = checkpoint['preprocessing_sequence']
@@ -67,7 +67,7 @@ def train():
         print(f'Starting the model at iteration {iteration + 1}')
 
     # prepare adversary
-    adversary = adversaries.AdversarialGenerator(model,criterion)
+    adversary = adversaries.AdversarialGenerator(model,criterion,args.preprocessing_adversarial_sequence) 
     
     bar = progressbar.ProgressBar(max_value=n_iterations_show)
     # train the model
@@ -80,6 +80,7 @@ def train():
             optimizer.zero_grad()
             inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
                     eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, alpha=learning_rate, train=True)
+            
             
             optimizer.zero_grad()
             

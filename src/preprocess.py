@@ -44,19 +44,19 @@ class PreProcess():
         self.transforms_inverse.reverse() 
 
     def forward(self, x):
-        self.flag_direction = 'forward'
+        
         x = x.numpy()
         for t in self.transforms_forward:
             x = t(x)
-        self.flag_direction = 'done_forward'
+        
         return torch.from_numpy(x).to(torch.float32)
 
     def inverse(self, x):
         x = x.numpy()
-        self.flag_direction = 'inverse'
+        
         for t in self.transforms_inverse:
             x = t(x)
-        self.flag_direction = 'done_inverse'
+        
         return torch.from_numpy(x).to(torch.float32)
 
     """def normalize(self, x):
@@ -95,20 +95,11 @@ class PreProcess():
         return y
 
     def stft(self, x):
-        self.x_shape = x.shape
-        s = list()
-        for b in range(x.shape[0]):
-            s.append(librosa.stft(x[b,:], n_fft=self.kwargs.get('stft_n_fft')))
-        s = np.stack(s)
-        
+        _, _, s = signal.stft(x, nperseg=128, noverlap=64,nfft=self.kwargs.get('stft_n_fft'))
         return s
 
     def istft(self, s):
-        x = np.zeros(self.x_shape)
-        #s_ = s[..., 0] + s[..., 1]*1.0j # add imag and real dimensions together
-        #input(s_.shape)
-        for b in range(s.shape[0]):
-            x[b] = librosa.istft(s[b,:,:])
+        _, x = signal.istft(s,nperseg=128, noverlap=64,nfft=self.kwargs.get('stft_n_fft'))
         return x
     
     def push_rgb_dim(self, x):
@@ -133,20 +124,16 @@ class PreProcess():
 
     def spectrogram(self, x):
         
-        """pad = wargs.get('spectrogram_pad')
-        if pad > 0:
-            x = torch.nn.functional.pad(x, (pad, pad), "constant")
-        """
         s = self.stft(x)
-        self.phi = np.arctan2(s.real,s.imag)
-        s_pow = np.sqrt(np.power(s.real,2) + np.power(s.imag,2))
+        self.phi = np.arctan2(s.real, s.imag)
+        s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
         
         return s_pow
 
     def ispectrogram(self, s_pow):
         
-        s_real = s_pow * np.cos(self.phi)
-        s_imag = s_pow * np.sin(self.phi)
+        s_real = s_pow * np.sin(self.phi)
+        s_imag = s_pow * np.cos(self.phi)
         s = s_real + s_imag*1.0j
         x = self.istft(s)
         return x

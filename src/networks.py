@@ -19,7 +19,7 @@ class DNN(torch.nn.Module):
         self.conv2 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=9)
         self.pool = nn.MaxPool2d(2,2)
         self.conv3 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3)
-        self.fc1 = nn.Linear(32 * 5 * 12, 120)
+        self.fc1 = nn.Linear(2080, 120)
         self.fc2 = nn.Linear(120, classes)
         self.flatten = nn.Flatten()
 
@@ -93,6 +93,8 @@ class CNN(torch.nn.Module):
 
         
     def forward(self, x):
-        x = self.preprocess.forward(x)
-        return self.model(x)
+        
+        temp = self.preprocess.forward(x)
+        
+        return self.model(temp)
 

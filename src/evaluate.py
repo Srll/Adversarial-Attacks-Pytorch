@@ -6,6 +6,11 @@ import networks
 import progressbar
 import adversaries
 import os
+import scipy
+import scipy.misc
+import preprocess
+import numpy as np
+from PIL import Image
 
 torch.manual_seed(1)
 
@@ -43,10 +48,15 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         target_name = labels_name[target_id]
     
     # TODO fix
-    input_type = 'images'
+    input_type = 'audio'
+    
     if input_type == 'images':
         save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
             path=figures_path, target_name=target_name)
+    elif input_type == 'audio':
+        save_audio(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
+            path=figures_path, target_name=target_name)
+
 
     loss /= len(dataloader)
     loss_adversarial /= len(dataloader)
@@ -118,20 +128,49 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
     plt.tight_layout()
     plt.savefig(os.path.join(path,body + 'resulting_image' + tail + '.png'),format='png')
 
+def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
+    
+    for i in range (2):
+        scipy.io.wavfile.write('x'+str(i)+'_adv.wav', 16000, x_adv[i].numpy())
+        scipy.io.wavfile.write('x'+str(i)+'.wav', 16000, x[i].numpy())
+        scipy.io.wavfile.write('adv_noise'+str(i)+'.wav', 16000, adv_noise[i].numpy())
+    
+    pre = preprocess.PreProcess(['spectrogram'])
+
+    
+    
+    
+    x1 = pre.forward(x)[0].numpy()
+    x2 = pre.forward(x_adv)[0].numpy()
+    x3 = x1 - x2
+    
+    #Rescale to 0-255 and convert to uint8
+    x1_r = (255.0 / x1.max() * (x1 - x1.min())).astype(np.uint8)
+    x2_r = (255.0 / x2.max() * (x2 - x2.min())).astype(np.uint8)
+    x3_r = (255.0 / x3.max() * (x3 - x3.min())).astype(np.uint8)
+    import pdb; pdb.set_trace()
+    im1 = Image.fromarray(x1_r)
+    im2 = Image.fromarray(x2_r)
+    im3 = Image.fromarray(x3_r)
+    im1.save('x.png')
+    im2.save('x_adv.png')
+    im3.save('x_adv_noise.png')
+
+    
 
 
 def evaluate():
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name 
     models_path = args.models_dir + args.dataset_name 
-    #preprocess_path = args.model_dir + args.preprocess_sequence
+    
     global figures_path
     figures_path = args.images_dir + args.dataset_name
-    model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
+    model = networks.CNN(args.model_name,dataset_name=args.dataset_name, preprocess_sequence=args.preprocessing_model_sequence)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
-    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True)
+    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
-    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=4, drop_last=True)
+    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     labels_name = dataset_eval.labels_name
 
     # obtain the criterion used for training 
@@ -139,7 +178,7 @@ def evaluate():
     criterion = torch.nn.CrossEntropyLoss()
 
     # load the checkpoint, if any 
-    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocess_sequence) + '.chkpt')
+    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocessing_model_sequence) + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
         model.preprocess = checkpoint['preprocessing_sequence']
@@ -151,7 +190,7 @@ def evaluate():
 
     # generate the adversary
     #global adversary
-    adversary = adversaries.AdversarialGenerator(model,criterion)
+    adversary = adversaries.AdversarialGenerator(model,criterion,args.preprocessing_adversarial_sequence)
 
 
     # evaluate the model 

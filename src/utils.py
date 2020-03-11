@@ -134,12 +134,12 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
 
         audio_path = self.audio_paths[idx]
-        fs, audio = wavread(audio_path) 
+        fs, audio = wavread(audio_path)
         
-        # preprocess()
+        
         audio = audio.astype(np.float32)
         
-        audio = audio_utils.zeropad(audio, 8000)
+        audio = audio_utils.zeropad(audio, 8064) # 0.5 seconds
         
         #spectrogram = audio_utils.spectrogram(audio)
         #spectrogram = spectrogram / np.max(spectrogram)
@@ -304,17 +304,10 @@ def get_args_train():
         help = 'number of iterations to show preliminar results and store the model')
     
     # Preprocessing parsing
-    """
-    parser.add_argument('--preprocess_lowpass', type = int, default = 4000, 
-        help = 'cutoff frequency for lowpass filter (Hz)')
-    parser.add_argument('--preprocess_spectrogram', type = bool, default = False, 
-        help = 'use spectrogram as input to classifier')
-    parser.add_argument('--preprocess_MFCC', type = bool, default = False, 
-        help = 'use MFCC as input to classifier')
-    """
-    parser.add_argument('--preprocess_sequence', nargs='+', type = str, default = 'None', 
+    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = 'None', 
         help = 'sequence of preprocessing steps')
-    
+    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = 'None', 
+        help = 'sequence of preprocessing steps')
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
@@ -360,6 +353,12 @@ def get_args_evaluate():
     parser.add_argument('--batch_size', type = int, default = 32, 
         help = 'number of samples in each batch')
     
+    # Preprocessing parsing
+    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = 'None', 
+        help = 'sequence of preprocessing steps')
+    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = 'None', 
+        help = 'sequence of preprocessing steps')
+
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
             'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
