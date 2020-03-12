@@ -18,12 +18,14 @@ class PreProcess():
                             'insert_rgb_dim': (self.push_rgb_dim, self.pop_rgb_dim),
                             'visualize': (self.plot,self.plot),
                             'dbg': (self.dbg, self.dbg),
-                            'normalize': (self.normalize, self.inormalize)}
+                            'normalize': (self.normalize, self.inormalize),
+                            'normalize_batch': (self.normalize_batch, self.inormalize_batch)}
 
 
         self.flag_direction = None # used for torubleshooting
         #self.kwargs = kwargs
-    
+
+        self.temp = 1
         # TODO make it possible to specify these through CLI
         self.kwargs =  {'coeffs_denominator' : signal.butter(6,5000,btype='low',fs=16000)[1],
                         'coeffs_numerator' : signal.butter(6,5000,btype='low',fs=16000)[0], 
@@ -61,6 +63,17 @@ class PreProcess():
 
     """def normalize(self, x):
     """
+    def normalize_batch(self, x):
+        if (len(x.shape) == 4):
+            self.temp = np.max(x)
+            return x / self.temp
+        else:
+            print("size of input doesn't allow for normalize_batch")
+            return x
+        
+
+    def inormalize_batch(self, x):
+        return x * self.temp
 
     # Preprocessing methods
     def normalize(self, x):
@@ -120,7 +133,7 @@ class PreProcess():
             x_new += x[:,0] * 0.3
             x_new += x[:,1] * 0.59
             x_new += x[:,2] * 0.11
-        return x_new
+        return x_new / 3
 
     def spectrogram(self, x):
         

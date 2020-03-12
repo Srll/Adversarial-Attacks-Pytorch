@@ -139,7 +139,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         
         audio = audio.astype(np.float32)
         
-        audio = audio_utils.zeropad(audio, 8064) # 0.5 seconds
+        audio = audio_utils.zeropad(audio, 16000) # 2 seconds
         
         #spectrogram = audio_utils.spectrogram(audio)
         #spectrogram = spectrogram / np.max(spectrogram)

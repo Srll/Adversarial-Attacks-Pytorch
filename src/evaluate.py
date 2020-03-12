@@ -75,11 +75,9 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
 
     
 def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
-
     def paint_images(im, correct):
         # convert to rgb
         if im.shape[1] == 1:
-            
             im_new = torch.zeros((im.shape[0],)+(3,)+(im.shape[2:]))
             
             im = torch.squeeze(im)
@@ -129,33 +127,34 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
     plt.savefig(os.path.join(path,body + 'resulting_image' + tail + '.png'),format='png')
 
 def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
-    
-    for i in range (2):
-        scipy.io.wavfile.write('x'+str(i)+'_adv.wav', 16000, x_adv[i].numpy())
-        scipy.io.wavfile.write('x'+str(i)+'.wav', 16000, x[i].numpy())
-        scipy.io.wavfile.write('adv_noise'+str(i)+'.wav', 16000, adv_noise[i].numpy())
+    divider = torch.max(x + adv_noise + x_adv) # TODO fix this
+    for i in range (x.shape[0]):
+        
+        
+        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'_adv.wav'), 16000, (x_adv[i]/divider).numpy())
+        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'.wav'), 16000, (x[i]/divider).numpy())
+        scipy.io.wavfile.write(os.path.join(path, 'adv_noise'+str(i)+'.wav'), 16000, (adv_noise[i]/divider).numpy())
     
     pre = preprocess.PreProcess(['spectrogram'])
 
-    
-    
-    
+
     x1 = pre.forward(x)[0].numpy()
     x2 = pre.forward(x_adv)[0].numpy()
     x3 = x1 - x2
-    
     #Rescale to 0-255 and convert to uint8
     x1_r = (255.0 / x1.max() * (x1 - x1.min())).astype(np.uint8)
-    x2_r = (255.0 / x2.max() * (x2 - x2.min())).astype(np.uint8)
-    x3_r = (255.0 / x3.max() * (x3 - x3.min())).astype(np.uint8)
-    import pdb; pdb.set_trace()
-    im1 = Image.fromarray(x1_r)
-    im2 = Image.fromarray(x2_r)
-    im3 = Image.fromarray(x3_r)
+    x2_r = (255.0 / x1.max() * (x2 - x1.min())).astype(np.uint8)
+    x3_r = (255.0 / x1.max() * (x3 - x1.min())).astype(np.uint8)
+    
+    
+    im1 = Image.fromarray(x1_r.T)
+    im2 = Image.fromarray(x2_r.T)
+    im3 = Image.fromarray(x3_r.T)
     im1.save('x.png')
     im2.save('x_adv.png')
     im3.save('x_adv_noise.png')
-
+    
+    
     
 
 

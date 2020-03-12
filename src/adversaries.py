@@ -85,7 +85,7 @@ class AdversarialGenerator(object):
         B = x.shape[0]                      # Batch size
         data_dims = len(x.shape) - 2        # subtract Batch and RGB dimensions
         max_idx = np.min(x.shape[2:]) - 1   # Only supports square area of perturbations
-        I = 5                               # Iterations of algorithm
+        I = 20                               # Iterations of algorithm
         
         parents_pos = np.random.randint(0,max_idx,(B,I,data_dims+1))    # position values (int)
         for b in range(B):
@@ -93,7 +93,8 @@ class AdversarialGenerator(object):
 
         parents_rgb = np.random.uniform(x_min, x_max, (B,I, x.shape[1])) # pixel values (float)
 
-        for _ in range(4): # iterations of DE
+        for _ in range(20): # iterations of DE
+            print(_)
             children_pos, children_rgb = evolve(parents_pos, parents_rgb)
             for i in range(I):
                 
@@ -109,7 +110,7 @@ class AdversarialGenerator(object):
 
                 if targeted == False:
                     idxs = np.nonzero(np.diag(y_new[:,y]) < np.diag(y_old[:,y]))
-                    print(idxs)
+                    #print(idxs)
                 else:
                     idxs = np.nonzero(np.diag(y_new[:,y]) > np.diag(y_old[:,y]))
                     
@@ -118,7 +119,8 @@ class AdversarialGenerator(object):
                 parents_rgb[idxs,i,:] = children_rgb[idxs,i,:]
 
         y_pred = np.zeros((B,I))
-        for i in range(I):
+
+        for i in range(I): # loop thruogh all candidates
             parents_p = add_perturbation(x_np, parents_pos, parents_rgb,i)
             parents_p = self.adversarial_preprocess.inverse(parents_p)
             with torch.no_grad():
