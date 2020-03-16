@@ -5,6 +5,7 @@ import torch.nn.functional as F
 import preprocess
 
 
+# TODO create more general spectrogram classifier(DNN class)
 
 # use http instead of https
 from torchvision.models.shufflenetv2 import model_urls
@@ -30,7 +31,6 @@ class DNN(torch.nn.Module):
         x = self.pool(self.conv2(x))
         
         x = self.pool(self.conv3(x))
-        
         
         x = self.flatten(x)
         x = self.fc1(x)
@@ -89,12 +89,12 @@ class CNN(torch.nn.Module):
             self.model = Simple_dense(classes)
         elif self.network_type == 'audio_cdnn':
             self.model = DNN(classes)
+            #self.model.fc = torch.nn.Linear(1024,classes)
 
 
         
     def forward(self, x):
         
         temp = self.preprocess.forward(x)
-        
         return self.model(temp)
 

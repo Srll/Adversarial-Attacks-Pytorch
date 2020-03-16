@@ -63,6 +63,10 @@ class PreProcess():
 
     """def normalize(self, x):
     """
+    
+
+
+
     def normalize_batch(self, x):
         if (len(x.shape) == 4):
             self.temp = np.max(x)
@@ -172,3 +176,45 @@ class PreProcess():
         import pdb
         pdb.set_trace()
         return x
+
+
+
+    def get_masking_threshold(self, x):
+        # algorithm based on values from "Audio Watermark, A Comprehensive Foundation Using MATLAB" from 2015
+        
+        def quite_threshold(f):
+            # output is in dB
+            threshold = 3.64*np.power(f/1000, -0.8) 
+                        - 6.5 np.exp(-0.6*(np.square((f/1000) - 3.3)))
+                        + 1e-3 * np.power(f/1000, 4)
+            return threshold
+        
+        def local_maximas(p):
+            # returns index of all local extrema over frequency axis
+            return np.stack(signal.argrelextrema(p, np.less, axis=1), axis=-1) 
+            
+
+        def hz_to_bark(f):
+            b = 13 * np.arctan(0.76*f / 1000) + 3.5 * np.square(np.arctan(f/7500))
+            return b
+        
+        
+
+
+
+        nfft = 512
+        n = np.arange(0, nfft-1)
+        w = np.sqrt(8/3) * 1/2 * (1 - np.cos(2*np.pi*n/nfft)) # modified hanning window (sum = 1 in power spectral domain)
+        f,_,s = signal.stft(x, window=h, nperseg=nfft, fs=16000) # TODO fix correct fs
+        psd = 10*np.log10((np.square(np.abs(s))))
+        p = 96 - np.max(psd, axis=1) + psd # max over frequency axis
+        
+        p_m_idxs = local_maximas(p)
+
+        for i in range(p_)
+        p_TM = 
+
+
+
+
+
