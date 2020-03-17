@@ -164,7 +164,7 @@ class PreProcess():
             return 700*(np.pow(10,m/2595) - 1)
         
         fs = 16000
-        NR_BINS = 26 # 26 is a usual amount of MEL bins
+        NR_BINS = 4 # 26 is a usual amount of MEL bins
 
         s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag) # save for reconstruction
@@ -187,13 +187,14 @@ class PreProcess():
         for k in range(1, idx.shape[0]-1):
             s_pow_bin_left = s_pow[..., idx[k-1]:idx[k]]
             s_pow_bin_right = s_pow[..., idx[k]:idx[k+1]]
-            left_triangle = np.arange(0,idx[k]-idx[k-1]) / (idx[k]-idx[k-1])
-            right_triangle = np.arange(0,idx[k+1]-idx[k]) / (idx[k+1]-idx[k])
+           
+            left_triangle = np.arange(1,1+idx[k]-idx[k-1]) / (idx[k]-idx[k-1])
+            right_triangle = np.arange(1,1+idx[k+1]-idx[k]) / (idx[k+1]-idx[k])
             
             
             
 
-            banks[..., k] = np.sum(s_pow_bin_left * left_triangle, axis=-1) + np.sum(s_pow_bin_right * right_triangle, axis=-1)
+            banks[..., k] = np.sum(s_pow_bin_left * left_triangle, axis=2) + np.sum(s_pow_bin_right * right_triangle, axis=2)
 
             left = s_pow_bin_left * left_triangle / np.expand_dims(banks[..., k], axis=-1)
             right = s_pow_bin_right * right_triangle / np.expand_dims(banks[..., k], axis=-1)
@@ -209,12 +210,15 @@ class PreProcess():
         return np.swapaxes(melFCC, 1, 2)
 
     def iMFCC(self, x):
+
         fs = 16000 # TODO 
         # 26 is a usual amount of MEL bins
-        NR_BINS = 26
+        NR_BINS = 4
+
+        
 
         melFCC = np.swapaxes(x, 1, 2)
-        banks_db = fftpack.dct(melFCC, axis=2)
+        banks_db = fftpack.idct(melFCC, axis=2)
 
         banks = self.db2mag(banks_db)
 
