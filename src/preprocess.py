@@ -1,6 +1,6 @@
 import librosa
 import numpy as np
-from scipy import signal
+from scipy import signal, fftpack
 import torch
 import matplotlib.pyplot as plt 
 # TODO add MFCC, MelSPECTROGRAM, delta calculations for MFCC, quantization, bandpass
@@ -10,10 +10,12 @@ class PreProcess():
     def __init__(self, transforms, **kwargs):
         # containing all supported preprocessing transforms and their corresponding inverse 
         
-        valid_transforms = {'None': (self.dummy, self.dummy),
+        valid_transforms = {None: (self.dummy, self.dummy),
+                            'None': (self.dummy, self.dummy),
                             'stft': (self.stft, self.istft),
                             'filter': (self.filt, self.ifilt), 
                             'spectrogram':(self.spectrogram, self.ispectrogram),
+                            'MFCC':(self.MFCC, self.iMFCC),
                             'mag2db':(self.mag2db, self.db2mag),
                             'insert_rgb_dim': (self.push_rgb_dim, self.pop_rgb_dim),
                             'visualize': (self.plot,self.plot),
@@ -61,8 +63,6 @@ class PreProcess():
         
         return torch.from_numpy(x).to(torch.float32)
 
-    """def normalize(self, x):
-    """
     
 
 
@@ -93,7 +93,8 @@ class PreProcess():
 
     def mag2db(self, x):
         #TODO fix divison by 0
-        return 20 * np.log10(x+0.0001)
+        x[x == 0] = np.finfo(float).eps
+        return 20 * np.log10(x)
     def db2mag(self, x):
         return np.power(10, x/20)
 
@@ -155,6 +156,95 @@ class PreProcess():
         x = self.istft(s)
         return x
     
+
+    def MFCC(self, x):
+        def f_to_m(f):
+            return 2595 * np.log10(1 + f/700)
+        def m_to_f(m):
+            return 700*(np.pow(10,m/2595) - 1)
+        
+        fs = 16000
+        NR_BINS = 26 # 26 is a usual amount of MEL bins
+
+        s = self.stft(x)
+        self.phi = np.arctan2(s.real, s.imag) # save for reconstruction
+        s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
+        
+        s_pow = np.swapaxes(s_pow, 1, 2)
+        
+        f = fs/2 * np.arange(0,s_pow.shape[2]) / s_pow.shape[2] 
+        m = f_to_m(f)
+        
+        m_bins = NR_BINS * m / np.max(m)
+        # assign to bins TODO add triangle window
+        m_bins = np.floor(m_bins)
+        # find all tranistions between values
+        idx = np.where(m_bins[:-1] != m_bins[1:])[0]
+
+        banks = np.zeros((s_pow.shape[:-1] + (NR_BINS,)))
+
+        self.bins_distribution = []
+        for k in range(1, idx.shape[0]-1):
+            s_pow_bin_left = s_pow[..., idx[k-1]:idx[k]]
+            s_pow_bin_right = s_pow[..., idx[k]:idx[k+1]]
+            left_triangle = np.arange(0,idx[k]-idx[k-1]) / (idx[k]-idx[k-1])
+            right_triangle = np.arange(0,idx[k+1]-idx[k]) / (idx[k+1]-idx[k])
+            
+            
+            
+
+            banks[..., k] = np.sum(s_pow_bin_left * left_triangle, axis=-1) + np.sum(s_pow_bin_right * right_triangle, axis=-1)
+
+            left = s_pow_bin_left * left_triangle / np.expand_dims(banks[..., k], axis=-1)
+            right = s_pow_bin_right * right_triangle / np.expand_dims(banks[..., k], axis=-1)
+
+
+            self.bins_distribution.append((left, right)) # save for reconstruction
+
+        
+        banks_db = self.mag2db(banks)
+        
+        melFCC = fftpack.dct(banks_db, axis=2)
+        
+        return np.swapaxes(melFCC, 1, 2)
+
+    def iMFCC(self, x):
+        fs = 16000 # TODO 
+        # 26 is a usual amount of MEL bins
+        NR_BINS = 26
+
+        melFCC = np.swapaxes(x, 1, 2)
+        banks_db = fftpack.dct(melFCC, axis=2)
+
+        banks = self.db2mag(banks_db)
+
+
+        s_pow = np.zeros(banks.shape[:-1] + (129,)) # TODO not hardcode
+        
+        idx_low = 0
+        idx_high = self.bins_distribution[0][0].shape[-1]
+        
+        
+        for k in range(NR_BINS-2):
+            print(k)
+            s_pow[..., idx_low:idx_high] = self.bins_distribution[k][0] * np.expand_dims(banks[..., k], axis=-1)
+            idx_low = idx_high
+            idx_high += self.bins_distribution[k][1].shape[-1]
+            s_pow[..., idx_low:idx_high] = self.bins_distribution[k][1] * np.expand_dims(banks[..., k], axis=-1)
+            
+        s_pow = np.swapaxes(s_pow, 1, 2)
+        
+        s_real = s_pow * np.sin(self.phi)
+        s_imag = s_pow * np.cos(self.phi)
+        s = s_real + s_imag*1.0j
+        x = self.istft(s)
+        return x
+        
+
+        
+        
+        
+
     def plot(self, x):
         if len(x.shape) == 3:
             x_p = x[0]
@@ -184,9 +274,9 @@ class PreProcess():
         
         def quite_threshold(f):
             # output is in dB
-            threshold = 3.64*np.power(f/1000, -0.8) 
-                        - 6.5 np.exp(-0.6*(np.square((f/1000) - 3.3)))
-                        + 1e-3 * np.power(f/1000, 4)
+            threshold = 3.64*np.power(f/1000, -0.8) \
+                - 6.5 * np.exp(-0.6*(np.square((f/1000) - 3.3))) \
+                + 1e-3 * np.power(f/1000, 4)
             return threshold
         
         def local_maximas(p):
@@ -211,8 +301,8 @@ class PreProcess():
         
         p_m_idxs = local_maximas(p)
 
-        for i in range(p_)
-        p_TM = 
+        #for i in range(p_)
+        #p_TM = 
 
 
 

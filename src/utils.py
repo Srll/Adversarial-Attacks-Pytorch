@@ -304,9 +304,9 @@ def get_args_train():
         help = 'number of iterations to show preliminar results and store the model')
     
     # Preprocessing parsing
-    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = 'None', 
+    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
         help = 'sequence of preprocessing steps')
-    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = 'None', 
+    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = [None], 
         help = 'sequence of preprocessing steps')
 
     # Adversarial training parsing 
@@ -354,9 +354,9 @@ def get_args_evaluate():
         help = 'number of samples in each batch')
     
     # Preprocessing parsing
-    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = 'None', 
+    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
         help = 'sequence of preprocessing steps')
-    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = 'None', 
+    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = [None], 
         help = 'sequence of preprocessing steps')
 
     # Adversarial training parsing 
