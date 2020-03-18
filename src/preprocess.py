@@ -31,7 +31,7 @@ class PreProcess():
         # TODO make it possible to specify these through CLI
         self.kwargs =  {'coeffs_denominator' : signal.butter(6,5000,btype='low',fs=16000)[1],
                         'coeffs_numerator' : signal.butter(6,5000,btype='low',fs=16000)[0], 
-                        'stft_n_fft':256,
+                        'stft_n_fft':512,
                         'max_value':100000}
 
 
@@ -113,8 +113,8 @@ class PreProcess():
         return y
 
     def stft(self, x):
-        _, _, s = signal.stft(x, nperseg=128, noverlap=64,nfft=self.kwargs.get('stft_n_fft'))
-        return s
+        f, t, s = signal.stft(x, nperseg=512, noverlap=0,nfft=self.kwargs.get('stft_n_fft'))
+        return f,t,s
 
     def istft(self, s):
         _, x = signal.istft(s,nperseg=128, noverlap=64,nfft=self.kwargs.get('stft_n_fft'))
@@ -142,7 +142,7 @@ class PreProcess():
 
     def spectrogram(self, x):
         
-        s = self.stft(x)
+        _,_.s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag)
         s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
         
@@ -164,9 +164,9 @@ class PreProcess():
             return 700*(np.pow(10,m/2595) - 1)
         
         fs = 16000
-        NR_BINS = 4 # 26 is a usual amount of MEL bins
+        NR_BINS = 20 # 26 is a usual amount of MEL bins
 
-        s = self.stft(x)
+        _,_,s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag) # save for reconstruction
         s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
         
@@ -203,11 +203,14 @@ class PreProcess():
             self.bins_distribution.append((left, right)) # save for reconstruction
 
         
+
         banks_db = self.mag2db(banks)
         
         melFCC = fftpack.dct(banks_db, axis=2)
-        
-        return np.swapaxes(melFCC, 1, 2)
+        melFCC = np.swapaxes(melFCC, 1, 2)
+        import pdb; pdb.set_trace()
+
+        return 
 
     def iMFCC(self, x):
 
@@ -267,6 +270,8 @@ class PreProcess():
         return x
 
     def dbg(self, x):
+        self.get_masking_threshold(x)
+        
         import pdb
         pdb.set_trace()
         return x
@@ -291,19 +296,47 @@ class PreProcess():
         def hz_to_bark(f):
             b = 13 * np.arctan(0.76*f / 1000) + 3.5 * np.square(np.arctan(f/7500))
             return b
-        
-        
+        quite_threshold
+        hz_to_bark
 
 
 
         nfft = 512
-        n = np.arange(0, nfft-1)
+        n = np.arange(0, nfft)
         w = np.sqrt(8/3) * 1/2 * (1 - np.cos(2*np.pi*n/nfft)) # modified hanning window (sum = 1 in power spectral domain)
-        f,_,s = signal.stft(x, window=h, nperseg=nfft, fs=16000) # TODO fix correct fs
-        psd = 10*np.log10((np.square(np.abs(s))))
-        p = 96 - np.max(psd, axis=1) + psd # max over frequency axis
+        f,_,s = signal.stft(x, window=w, nperseg=nfft, fs=16000) # TODO fix correct fs
+        psd = 1/2*self.mag2db(np.square(np.abs(s)))
+        
+        
+        p = np.swapaxes(96 - np.max(psd, axis=1) + np.swapaxes(psd,0,1),0,1) # max over frequency axis
         
         p_m_idxs = local_maximas(p)
+
+        STM = []
+        for i in range(p_m_idxs.shape[0]):
+            masker = True
+            if 1 < p_m_idxs[i][1] < 62: # check what bark range to use
+                dk_l = [-2, 2]
+            elif 61 < p_m_idxs[i][1] < 127:
+                dk_l = [-3,-2,2, 3]
+            elif 126 < p_m_idxs[i][1] < 249:
+                dk_l = [-6,-5,-4,-3,-2, 2,3,4,5,6]
+            else:
+                masker = False
+                dk_l = []
+            
+            for dk in dk_l:
+        
+                if p[p_m_idxs[i][0],p_m_idxs[i][1],p_m_idxs[i][2]] - p[p_m_idxs[i][0],p_m_idxs[i][1]+dk,p_m_idxs[i][2]] <= 7:
+                    masker = False
+                    break
+
+            if masker == True:
+                STM.append(i)
+
+        import pdb; pdb.set_trace()
+
+            
 
         #for i in range(p_)
         #p_TM = 
