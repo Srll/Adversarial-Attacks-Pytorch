@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 import preprocess
+import masking
 
 class AdversarialGenerator(object):
 
@@ -43,7 +44,15 @@ class AdversarialGenerator(object):
                 print('Not yet implemente')
             return x_adv, x_delta, y_estimate_adv, y_estimate
 
+    def generate_adversarial_masked_sparse(self, x, y, targeted=False, x_min=-1, x_max=1, train=False, nr_of_pixels=1):
+        masking_threshold = []
+        for b in range(x.shape[0]): # iterate over batch
+            masking_threshold.append(masking.get_masking_threshold(x[b]))
+        MT = np.asarray(masking_threshold)
+
     
+
+
     def generate_adversarial_ONE_PIXEL(self, x, y, targeted=False, x_min=-1, x_max=1, train=False, nr_of_pixels=1):
         # TODO add reduce computational complexity of algorithm, reduce amount of comparissons
         # TODO accept sparsity as a parameter, ie how many "pixels" should be altered
@@ -85,7 +94,7 @@ class AdversarialGenerator(object):
         B = x.shape[0]                      # Batch size
         data_dims = len(x.shape) - 2        # subtract Batch and RGB dimensions
         max_idx = np.min(x.shape[2:]) - 1   # Only supports square area of perturbations
-        I = 20                               # Iterations of algorithm
+        I = 20                              # Iterations of algorithm  population
         
         parents_pos = np.random.randint(0,max_idx,(B,I,data_dims+1))    # position values (int)
         for b in range(B):

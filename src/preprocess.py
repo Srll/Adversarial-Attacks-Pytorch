@@ -21,7 +21,7 @@ class PreProcess():
                             'visualize': (self.plot,self.plot),
                             'dbg': (self.dbg, self.dbg),
                             'normalize': (self.normalize, self.inormalize),
-                            'normalize_batch': (self.normalize_batch, self.inormalize_batch)}
+                            'normalize_batch': (self.normalize_batch, self.inormalize_batch),}
 
 
         self.flag_direction = None # used for torubleshooting
@@ -277,7 +277,7 @@ class PreProcess():
         return x
 
 
-
+    """
     def get_masking_threshold(self, x):
         # algorithm based on values from "Audio Watermark, A Comprehensive Foundation Using MATLAB" from 2015
         
@@ -340,6 +340,11 @@ class PreProcess():
 
         #for i in range(p_)
         #p_TM = 
+    """
+
+
+
+
 
 
 
