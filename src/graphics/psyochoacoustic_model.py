@@ -59,7 +59,7 @@ for t_idx in range(t_steps.shape[0]):
         if 1 < P_lm[i][0] < 62: # check what bark range to use
             dk_l = [-2, 2]
         elif 61 < P_lm[i][0] < 127:
-            dk_l = [-3,-2,2, 3]
+            dk_l = [-3,-2, 2, 3]
         elif 126 < P_lm[i][0] < 249:
             dk_l = [-6,-5,-4,-3,-2, 2,3,4,5,6]
         else:
@@ -74,7 +74,6 @@ for t_idx in range(t_steps.shape[0]):
 
                 break
             
-
         if masker == True:
             S_TM.append([P_lm[i][0],P_lm[i][1]])
 
@@ -141,7 +140,7 @@ for t_idx in range(t_steps.shape[0]):
     #import pdb; pdb.set_trace()
     P_TM_idx = quiet_threshold(f_steps[S_TM[...,0]]) < P_TM   # tonal
     S_TM = S_TM[P_TM_idx]
-    print(S_TM.shape)
+    #print(S_TM.shape)
     
     pop_idx = []
     for i in range(S.shape[1]):
@@ -227,13 +226,13 @@ for t_idx in range(t_steps.shape[0]):
     mask_frame_NM = mag2db(mask_frame_NM)
     
     L_G = mag2db(db2mag(mask_frame_TM) + db2mag(mask_frame_NM))
-    """
+    
     plt.plot(maskees,L_G[:,10])
     plt.plot(maskees,mask_frame_NM[:,10])
     plt.plot(maskees,mask_frame_TM[:,10])
     plt.plot(maskees,P[:,10])
     plt.show()
-    """
+    
 
     # ============================= STEP 5 =============================
 

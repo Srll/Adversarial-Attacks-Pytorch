@@ -1,16 +1,54 @@
 import numpy as np
-from get_audio import get_audio_sin, get_audio_speech
+
 from scipy import signal
+from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
+
+
+
+# returns same shaped mask as x
+def get_mask_batches(x, z, fs, N_bins):
+    
+    
+    m = z.copy()
+    for b in range(x.shape[0]):
+        m[b] = resample_to_hz(get_masking_threshold(x[b]), N_bins, fs, z)
+    return m
+
+
+
+
+def resample_to_hz(mask_in_bark, N_hz, fs, z):
+    f = np.linspace(1, fs/2, N_hz)
+    bark = f_to_bark(f)
+    mask_in_hz = np.zeros((N_hz, mask_in_bark.shape[1]))
+    
+    for t in range(mask_in_bark.shape[1]):
+        interp = interp1d(np.linspace(0,25,mask_in_bark[:,t].shape[0]),mask_in_bark[:,t]) # TODO check if this linspace is accurate
+        mask_in_hz[:,t] = interp(bark)
+
+    return db2mag(mask_in_hz)
+
+    
+
+def mag2db(x_):
+    x_[x_ == 0] = np.finfo(float).eps
+    return 10 * np.log10(x_)
+
+def db2mag(x_):
+    return np.power(10, x_/10)
+
+
+def f_to_bark(f):
+    #return 6 * np.arcsinh(f/600)
+    return 13*np.arctan(0.76*f / 1000) + 3.5*np.square(np.arctan(f/7500)) # TODO use this one 
+
+def bark_to_f(bark):
+    return 600 * np.sinh(bark/6)
+    
 
 def get_masking_threshold(x):
 
-    def mag2db(x_):
-        x_[x_ == 0] = np.finfo(float).eps
-        return 10 * np.log10(x_)
-
-    def db2mag(x_):
-        return np.power(10, x_/10)
 
     def quiet_threshold(f):
         # output is in dB
@@ -23,11 +61,6 @@ def get_masking_threshold(x):
         # returns index of all local extrema over frequency axis
         return np.stack(signal.argrelextrema(p, np.greater, axis=0), axis=-1) 
 
-    def f_to_bark(f):
-        return 13*np.arctan(0.76*f / 1000) + 3.5*np.square(np.arctan(f/7500))
-
-    def bark_to_f(bark):
-        return 
 
     # critical bands over frequency spectrum
     CB_f = [0,100,200,300,400,510,630,770,920, \
@@ -46,7 +79,7 @@ def get_masking_threshold(x):
     n = np.arange(N)
     w = np.sqrt(8/3) * (1/2) * (1 - np.cos(2*np.pi*n/N))
 
-    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=fs)
+    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=fs, noverlap=0)
     bark_steps = f_to_bark(f_steps)
     PSD = 10 * np.log10(np.square(np.abs(S)))
     P = 96 - np.max(PSD) + PSD # should this be over one FFT or over STFT?
@@ -116,7 +149,10 @@ def get_masking_threshold(x):
     bark_list = (bark_steps//1).astype(int).tolist()
     for i,idx in enumerate(bark_list):
         bins_f[idx] += np.log10(f_steps[i])
-    bins_f /= np.unique(bark_list, return_counts=True)[1]
+    
+    
+    
+    bins_f[np.unique(bark_list, return_counts=True)[0]] /= np.unique(bark_list, return_counts=True)[1]
     bins_f = np.power(10, bins_f)
 
     #bins_f = np.power(10, bins_f)
@@ -140,7 +176,7 @@ def get_masking_threshold(x):
     P_NM = np.zeros((25,S.shape[1]))  # TODO add constant -inf ?
     P_NM[P_NM_idx == True] = bins_e[P_NM_idx]
 
-    #import pdb; pdb.set_trace()
+    
     P_TM_idx = quiet_threshold(f_steps[S_TM[...,0]]) < P_TM   # tonal
     S_TM = S_TM[P_TM_idx]
     print(S_TM.shape)
@@ -151,10 +187,13 @@ def get_masking_threshold(x):
         bark_of_max = f_to_bark(f_steps[S_TM[i == S_TM[...,1]][...,0]])
         bark_diff = np.diff(bark_of_max)
         for k, diff in enumerate(bark_diff):
-            if diff <= 0.5:
+            if diff <= 0.5 and k<len(bark_diff) -1:
                 # check which max to keep
-                value1 = P_TM[S_TM[i == S_TM[...,1]][...,0]][k]
-                value2 = P_TM[S_TM[i == S_TM[...,1]][...,0]][k+1]
+                try:
+                    value1 = P[ S_TM[i == S_TM[...,1]][...,0][k],S_TM[i == S_TM[...,1]][...,1][k]  ]
+                    value2 = P[ S_TM[i == S_TM[...,1]][...,0][k+1],S_TM[i == S_TM[...,1]][...,1][k+1]  ]
+                except:
+                    import pdb; pdb.set_trace()
                 if value1 > value2:
                     # add idx to pop list 
                     pop_idx.append([S_TM[i == S_TM[...,1]][...,0][k],i])
@@ -187,8 +226,14 @@ def get_masking_threshold(x):
     mask_frame_NM = np.zeros((nr_maskees, S.shape[1]))
     
     for i in range(P_TM.shape[0]):
-        value  = P_TM[i]
-        idxs = S_TM[i]
+        
+        try:
+            value  = P_TM[i]
+            idxs = S_TM[i]
+        except:
+            import pdb; pdb.set_trace()
+
+
         idx_bark   = f_to_bark(f_steps[idxs[0]])
         for j in range(maskees.shape[0]):
             dz = maskees[j] - idx_bark

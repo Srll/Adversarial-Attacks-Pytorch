@@ -17,7 +17,9 @@ class PreProcess():
                             'spectrogram':(self.spectrogram, self.ispectrogram),
                             'MFCC':(self.MFCC, self.iMFCC),
                             'mag2db':(self.mag2db, self.db2mag),
+                            'mag2db2':(self.mag2db2, self.mag2db2),
                             'insert_rgb_dim': (self.push_rgb_dim, self.pop_rgb_dim),
+                            'insert_data_dim': (self.push_data_dim, self.pop_data_dim),
                             'visualize': (self.plot,self.plot),
                             'dbg': (self.dbg, self.dbg),
                             'normalize': (self.normalize, self.inormalize),
@@ -91,6 +93,12 @@ class PreProcess():
     def dummy(self, x):
         return x
 
+    def mag2db2(self,x):
+        PSD = 10 * np.log10(np.square(np.abs(x)))
+        P = 96 - np.max(PSD) + PSD # should this be over one FFT or over STFT?
+        return P
+    def mag2db2i
+
     def mag2db(self, x):
         #TODO fix divison by 0
         x[x == 0] = np.finfo(float).eps
@@ -117,7 +125,7 @@ class PreProcess():
         return f,t,s
 
     def istft(self, s):
-        _, x = signal.istft(s,nperseg=128, noverlap=64,nfft=self.kwargs.get('stft_n_fft'))
+        _, x = signal.istft(s,nperseg=512, noverlap=0,nfft=self.kwargs.get('stft_n_fft'))
         return x
     
     def push_rgb_dim(self, x):
@@ -132,6 +140,17 @@ class PreProcess():
             print("Not supported size for RGB conversion")
         return x_new
     
+    def push_data_dim(self, x):
+        dims = len(x.shape)
+        x = np.squeeze(x)
+        if dims == 3:
+            x_new = np.zeros((x.shape[0],) + (1,) + (x.shape[1:]))
+            x_new[:,0] = x / 0.3
+        else:
+            print("Not supported size for RGB conversion")
+        return x_new
+
+
     def pop_rgb_dim(self, x):
         x_new = np.zeros((x.shape[0],) + x.shape[2:])
         if x.shape[1] == 3:
@@ -140,9 +159,16 @@ class PreProcess():
             x_new += x[:,2] * 0.11
         return x_new / 3
 
+    def pop_data_dim(self, x):
+        x_new = np.zeros((x.shape[0],) + x.shape[2:])
+        x_new = x[:,0]
+        return x_new
+
+
+
     def spectrogram(self, x):
         
-        _,_.s = self.stft(x)
+        _,_,s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag)
         s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
         
@@ -157,7 +183,7 @@ class PreProcess():
         return x
     
 
-    def MFCC(self, x):
+    def MFCC(self, x): # TODO
         def f_to_m(f):
             return 2595 * np.log10(1 + f/700)
         def m_to_f(m):

@@ -16,11 +16,11 @@ model_urls['shufflenetv2_x0.5'] = model_urls['shufflenetv2_x0.5'].replace('https
 class DNN(torch.nn.Module):
     def __init__(self, classes):
         super(DNN, self).__init__()
-        self.conv1_1d = nn.Conv1d(in_channels=129, out_channels=32,kernel_size=64,stride=1,padding=0)
+        self.conv1_1d = nn.Conv1d(in_channels=257, out_channels=32,kernel_size=16,stride=1,padding=0)
         self.conv2 = nn.Conv2d(in_channels=1, out_channels=32, kernel_size=9)
         self.pool = nn.MaxPool2d(2,2)
         self.conv3 = nn.Conv2d(in_channels=32, out_channels=32, kernel_size=3)
-        self.fc1 = nn.Linear(7040, 120)
+        self.fc1 = nn.Linear(160, 120)
         self.fc2 = nn.Linear(120, classes)
         self.flatten = nn.Flatten()
 

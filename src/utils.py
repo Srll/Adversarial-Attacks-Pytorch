@@ -139,7 +139,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         
         audio = audio.astype(np.float32)
         
-        audio = audio_utils.zeropad(audio, 16000) # 2 seconds
+        audio = audio_utils.zeropad(audio, 16384) # 2 seconds
         
         #spectrogram = audio_utils.spectrogram(audio)
         #spectrogram = spectrogram / np.max(spectrogram)
@@ -311,7 +311,7 @@ def get_args_train():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -361,11 +361,11 @@ def get_args_evaluate():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking'
         ], default = 'FGSM_vanilla',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
