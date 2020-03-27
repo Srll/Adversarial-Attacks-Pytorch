@@ -17,7 +17,7 @@ class PreProcess():
                             'spectrogram':(self.spectrogram, self.ispectrogram),
                             'MFCC':(self.MFCC, self.iMFCC),
                             'mag2db':(self.mag2db, self.db2mag),
-                            'mag2db2':(self.mag2db2, self.mag2db2),
+                            'mag2db2':(self.mag2db2, self.db2mag2),
                             'insert_rgb_dim': (self.push_rgb_dim, self.pop_rgb_dim),
                             'insert_data_dim': (self.push_data_dim, self.pop_data_dim),
                             'visualize': (self.plot,self.plot),
@@ -94,15 +94,22 @@ class PreProcess():
         return x
 
     def mag2db2(self,x):
+        x[x == 0] = np.finfo(float).eps
         PSD = 10 * np.log10(np.square(np.abs(x)))
         P = 96 - np.max(PSD) + PSD # should this be over one FFT or over STFT?
+        self.max = np.max(PSD)
         return P
-    def mag2db2i
+    def db2mag2(self,P):
+        PSD = P - 96 + self.max
+        np.power(10, PSD/10)
+        return P
+
 
     def mag2db(self, x):
         #TODO fix divison by 0
         x[x == 0] = np.finfo(float).eps
         return 20 * np.log10(x)
+    
     def db2mag(self, x):
         return np.power(10, x/20)
 

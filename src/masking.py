@@ -22,12 +22,15 @@ def resample_to_hz(mask_in_bark, N_hz, fs, z):
     f = np.linspace(1, fs/2, N_hz)
     bark = f_to_bark(f)
     mask_in_hz = np.zeros((N_hz, mask_in_bark.shape[1]))
+
     
+    mask_in_bark = np.nan_to_num(mask_in_bark, 0.0001)
+
     for t in range(mask_in_bark.shape[1]):
         interp = interp1d(np.linspace(0,25,mask_in_bark[:,t].shape[0]),mask_in_bark[:,t]) # TODO check if this linspace is accurate
         mask_in_hz[:,t] = interp(bark)
 
-    return db2mag(mask_in_hz)
+    return mask_in_hz
 
     
 
@@ -199,14 +202,16 @@ def get_masking_threshold(x):
                     pop_idx.append([S_TM[i == S_TM[...,1]][...,0][k],i])
                 else:
                     pop_idx.append([S_TM[i == S_TM[...,1]][...,0][k+1],i])
-            
+    
+    
+    pop_list = []
     for idx in pop_idx:
         for i in np.where(S_TM[...,0] == idx[0])[0].tolist():
             if S_TM[i][1] == idx[1]:
-                pop = i
-        
-        S_TM = np.delete(S_TM, pop, 0)
-        P_TM = np.delete(P_TM, pop, 0)
+                pop_list.append(i)
+
+    S_TM = np.delete(S_TM, pop_list, 0)
+    P_TM = np.delete(P_TM, pop_list, 0)
     """
     plt.plot(f_steps[S_TM[S_TM[:,1]==4][...,0]], P_TM[S_TM[:,1]==4],'go')
     plt.plot(bins_f[:-1], bins_e[:,4],'ro')
@@ -225,7 +230,7 @@ def get_masking_threshold(x):
 
     mask_frame_NM = np.zeros((nr_maskees, S.shape[1]))
     
-    for i in range(P_TM.shape[0]):
+    for i in range(np.minimum(S_TM.shape[0], P_TM.shape[0])):
         
         try:
             value  = P_TM[i]
@@ -281,7 +286,7 @@ def get_masking_threshold(x):
     plt.plot(maskees,P[:,10])
     plt.show()
     """
-
+    
     # ============================= STEP 5 =============================
 
     return L_G

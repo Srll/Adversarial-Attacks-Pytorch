@@ -70,6 +70,7 @@ class AdversarialGenerator(object):
         
         
         m = masking.get_mask_batches(x_old.numpy(), x_np, 16000, x_np.shape[2])
+        
         print("max m: ")
         print(np.max(m))
         print( "max x: " )
