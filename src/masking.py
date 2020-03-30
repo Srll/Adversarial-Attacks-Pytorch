@@ -12,6 +12,7 @@ def get_mask_batches(x, z, fs, N_bins):
     
     m = z.copy()
     for b in range(x.shape[0]):
+        print(b)
         m[b] = resample_to_hz(get_masking_threshold(x[b]), N_bins, fs, z)
     return m
 
@@ -55,6 +56,7 @@ def get_masking_threshold(x):
 
     def quiet_threshold(f):
         # output is in dB
+        f[f==0] = np.finfo(float).eps
         threshold = 3.64*np.power(f/1000, -0.8) \
             - 6.5 * np.exp(-0.6*(np.square((f/1000) - 3.3))) \
             + 1e-3 * np.power(f/1000, 4)
@@ -82,9 +84,12 @@ def get_masking_threshold(x):
     n = np.arange(N)
     w = np.sqrt(8/3) * (1/2) * (1 - np.cos(2*np.pi*n/N))
 
-    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=fs, noverlap=0)
+    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=fs, noverlap=N/2)
     bark_steps = f_to_bark(f_steps)
-    PSD = 10 * np.log10(np.square(np.abs(S)))
+
+    S_ = np.square(np.abs(S))
+    S_[S_==0] = np.finfo(float).eps
+    PSD = 10 * np.log10(S_)
     P = 96 - np.max(PSD) + PSD # should this be over one FFT or over STFT?
 
     # ============================= STEP 2 =============================
@@ -151,7 +156,7 @@ def get_masking_threshold(x):
     
     bark_list = (bark_steps//1).astype(int).tolist()
     for i,idx in enumerate(bark_list):
-        bins_f[idx] += np.log10(f_steps[i])
+        bins_f[idx] += np.log10(f_steps[i]+np.finfo(float).eps) # fix log10(0)
     
     
     
@@ -182,7 +187,7 @@ def get_masking_threshold(x):
     
     P_TM_idx = quiet_threshold(f_steps[S_TM[...,0]]) < P_TM   # tonal
     S_TM = S_TM[P_TM_idx]
-    print(S_TM.shape)
+
     
     pop_idx = []
     for i in range(S.shape[1]):

@@ -127,12 +127,11 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
     plt.savefig(os.path.join(path,body + 'resulting_image' + tail + '.png'),format='png')
 
 def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
-    divider = torch.max(x + adv_noise + x_adv) # TODO fix this
+    
     for i in range (x.shape[0]):
-        
-        
-        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'_adv.wav'), 16000, (x_adv[i]/divider).numpy())
+        divider = torch.max(x[i] + adv_noise[i] + x_adv[i]) # TODO fix this    
         scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'.wav'), 16000, (x[i]/divider).numpy())
+        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'_adv.wav'), 16000, (x_adv[i]/divider).numpy())
         scipy.io.wavfile.write(os.path.join(path, 'adv_noise'+str(i)+'.wav'), 16000, (adv_noise[i]/divider).numpy())
     
     pre = preprocess.PreProcess(['spectrogram'])
@@ -194,8 +193,11 @@ def evaluate():
 
     # evaluate the model 
     input_type = args.model_name.split('_')[0]
+
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
+
+
 
 if __name__ == "__main__":
     evaluate()

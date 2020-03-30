@@ -97,12 +97,17 @@ class PreProcess():
         x[x == 0] = np.finfo(float).eps
         PSD = 10 * np.log10(np.square(np.abs(x)))
         P = 96 - np.max(PSD) + PSD # should this be over one FFT or over STFT?
+        #self.max = np.max(PSD, axis=1)
         self.max = np.max(PSD)
         return P
+
     def db2mag2(self,P):
+        PSD = np.zeros_like(P)
+        #for b in range(P.shape[0]):
+        #    PSD[b] = P[b] - 96 + self.max[b]
         PSD = P - 96 + self.max
-        np.power(10, PSD/10)
-        return P
+        x = np.sqrt(np.power(10, PSD/10))
+        return x
 
 
     def mag2db(self, x):
@@ -128,11 +133,11 @@ class PreProcess():
         return y
 
     def stft(self, x):
-        f, t, s = signal.stft(x, nperseg=512, noverlap=0,nfft=self.kwargs.get('stft_n_fft'))
+        f, t, s = signal.stft(x, nperseg=512, noverlap=256,nfft=self.kwargs.get('stft_n_fft'))
         return f,t,s
 
     def istft(self, s):
-        _, x = signal.istft(s,nperseg=512, noverlap=0,nfft=self.kwargs.get('stft_n_fft'))
+        _, x = signal.istft(s,nperseg=512, noverlap=256,nfft=self.kwargs.get('stft_n_fft'))
         return x
     
     def push_rgb_dim(self, x):
@@ -152,7 +157,7 @@ class PreProcess():
         x = np.squeeze(x)
         if dims == 3:
             x_new = np.zeros((x.shape[0],) + (1,) + (x.shape[1:]))
-            x_new[:,0] = x / 0.3
+            x_new[:,0] = x
         else:
             print("Not supported size for RGB conversion")
         return x_new
@@ -177,12 +182,11 @@ class PreProcess():
         
         _,_,s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag)
-        s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
         
+        s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
         return s_pow
 
     def ispectrogram(self, s_pow):
-        
         s_real = s_pow * np.sin(self.phi)
         s_imag = s_pow * np.cos(self.phi)
         s = s_real + s_imag*1.0j
@@ -367,7 +371,6 @@ class PreProcess():
             if masker == True:
                 STM.append(i)
 
-        import pdb; pdb.set_trace()
 
             
 
