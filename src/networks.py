@@ -166,12 +166,6 @@ class CNN(torch.nn.Module):
         elif self.network_type == 'audio_MJ':
             self.model = audio_MJ(classes)
 
-
-        """elif self.network_type == 'audio_conv_raw':
-            self.model = TheModelClass(classes)
-        elif self.network_type == 'simple_dense':
-            self.model = Simple_dense(classes)"""
-
     def GPU(self, enable):
         if enable:
             if torch.cuda.is_available():
