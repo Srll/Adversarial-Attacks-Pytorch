@@ -17,7 +17,7 @@ def train():
     args = utils.get_args_train()
 
     # obtain the model and the datasets
-    dataset_path = args.datasets_dir + args.dataset_name 
+    dataset_path = args.datasets_dir + args.dataset_name
     models_path = args.models_dir + args.dataset_name 
     #if args.model_name == "simple_dense":
     #    model = networks.Simple_dense(10)

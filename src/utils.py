@@ -23,8 +23,8 @@ def create_speech_commands_dataset_atlas(directory, force=False):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
 
-            paths['train'] += path_names[:int(len(path_names)*0.998)]
-            paths['validation'] += path_names[int(len(path_names)*0.998):]
+            paths['train'] += path_names[:int(len(path_names)*0.99)]
+            paths['validation'] += path_names[int(len(path_names)*0.99):]
         
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -132,6 +132,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         audio = audio.astype(np.float32)
         
         audio = audio_utils.zeropad(audio, 16384) # 2 seconds
+        #audio = audio_utils.zeropad(audio, 32000) # 4 seconds
         
         #spectrogram = audio_utils.spectrogram(audio)
         #spectrogram = spectrogram / np.max(spectrogram)
@@ -283,7 +284,7 @@ def get_args_train():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_cdnn'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--n_iterations', type = int, default = 2000, 
@@ -341,7 +342,7 @@ def get_args_evaluate():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_cdnn'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 
@@ -389,3 +390,7 @@ def simple_hash(words):
         y += (len(word)*(i + 7)) * 137
     y = y % 9999
     return str(y)
+
+#####################
+#    Torch utils    #
+#####################
