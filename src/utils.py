@@ -134,10 +134,6 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         audio = audio_utils.zeropad(audio, 16384) # 2 seconds
         #audio = audio_utils.zeropad(audio, 32000) # 4 seconds
         
-        #spectrogram = audio_utils.spectrogram(audio)
-        #spectrogram = spectrogram / np.max(spectrogram)
-        #spectrogram = np.expand_dims(spectrogram, axis=0)
-        # spectrogram_rgb = convert_to_rgb(spectrogram)
         label = self.labels[idx]
         return audio, label
 
@@ -350,8 +346,6 @@ def get_args_evaluate():
     parser.add_argument('--gpu', dest='gpu', action='store_true',
         help = 'If flag is present the program will use available CUDA device')
     parser.set_defaults(feature=False)
-    #parser.add_argument('--gpu', choices = [True, False], default= False,
-    #  
     
     # Preprocessing parsing
     parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
@@ -391,6 +385,3 @@ def simple_hash(words):
     y = y % 9999
     return str(y)
 
-#####################
-#    Torch utils    #
-#####################

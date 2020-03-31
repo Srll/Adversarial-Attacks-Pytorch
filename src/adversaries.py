@@ -49,9 +49,9 @@ class AdversarialGenerator(object):
             elif adversarial_type == 'ONE_PIXEL':
                 x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_ONE_PIXEL(x, target, targeted, x_min, x_max, train)
             elif adversarial_type == 'DE':
-                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_DE_masking(x, target, targeted, 0, 20, train, mask=False)
+                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_DE_masking(x, target, targeted, 0, 1, train, mask=False)
             elif adversarial_type == 'DE_masking':
-                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_DE_masking(x, target, targeted, 0, 20, train)
+                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_DE_masking(x, target, targeted, 10, 20, train)
             elif adversarial_type == 'free':
                 print('Not yet implemented')
             elif adversarial_type == 'fast':
@@ -60,7 +60,7 @@ class AdversarialGenerator(object):
 
 
 
-    def generate_adversarial_DE_masking(self, x, y, targeted=False, x_min=0, x_max=30, train=False, N_perturbations=10, N_iterations=50, N_population=50, mask=True):
+    def generate_adversarial_DE_masking(self, x, y, targeted=False, x_min=0, x_max=30, train=False, N_perturbations=100, N_iterations=100, N_population=100, mask=True):
         self.model.eval()
         x_old = x.clone().detach() # save for evaluation at the end
         x = self.adversarial_preprocess.forward(x)
