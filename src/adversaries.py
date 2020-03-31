@@ -60,15 +60,16 @@ class AdversarialGenerator(object):
 
 
 
-    def generate_adversarial_DE_masking(self, x, y, targeted=False, x_min=0, x_max=50, train=False):   
+    def generate_adversarial_DE_masking(self, x, y, targeted=False, x_min=0, x_max=30, train=False):
         self.model.eval()
-        
-        N_perturbations = 100
-        N_iterations = 100
-        N_population = 100
+        x_min = 0
+        x_max = 20
+        N_perturbations = 1500
+        N_iterations = 50
+        N_population = 50
 
 
-        x_old = x.clone().detach() # save for evaluation later
+        x_old = x.clone().detach() # save for evaluation at the end
         x = self.adversarial_preprocess.forward(x)
         
         x_np = x.numpy()
@@ -138,32 +139,30 @@ class AdversarialGenerator(object):
 
         y = y.numpy().astype(int)
 
-        for _ in progressbar.progressbar(range(N_iterations), redirect_stdout=True):
-            
-            #for _ in range(N_iterations):
 
+        
+        y_old = np.zeros((B,I))
+        for i in range(N_population):
+            p_p = add_perturbation(x_np, p_pos, p_val,i) # get perturbed x by p
+            p_p_i = self.adversarial_preprocess.inverse(p_p)
+            with torch.no_grad():
+                y_old[:,i] = np.diag(torch.nn.functional.softmax(self.model(p_p_i), dim=1).numpy()[:,y])
+
+
+        
+        for _ in progressbar.progressbar(range(N_iterations), redirect_stdout=True):
             c_pos, c_val = evolve(p_pos, p_val)
             
             for i in range(N_population): # loop over population (allows batch size evaluation)
-                #seconds_loop = time.time()
                 c_p = add_perturbation(x_np, c_pos, c_val,i) # get perturbed x by c
-                p_p = add_perturbation(x_np, p_pos, p_val,i) # get perturbed x by p
-                
                 c_p_i = self.adversarial_preprocess.inverse(c_p)
-                p_p_i = self.adversarial_preprocess.inverse(p_p)
-                
                 with torch.no_grad():
-                    #y_new = softmax(self.model(c_p_i).numpy())
-                    #y_old = softmax(self.model(p_p_i).numpy())
-                    #seconds_torch = time.time()
-                    y_new = torch.nn.functional.softmax(self.model(c_p_i), dim=1).numpy()
-                    y_old = torch.nn.functional.softmax(self.model(p_p_i), dim=1).numpy()
-                    #print("torch:", str(time.time() - seconds_torch))
+                    y_new = np.diag(torch.nn.functional.softmax(self.model(c_p_i), dim=1).numpy()[:,y])
                 
                 if targeted == False:
-                    idxs = np.nonzero(np.diag(y_new[:,y]) < np.diag(y_old[:,y]))[0]
+                    idxs = np.nonzero(y_new < y_old[:,i])[0]
                 else:
-                    idxs = np.nonzero(np.diag(y_new[:,y]) > np.diag(y_old[:,y]))[0]
+                    idxs = np.nonzero(y_new > y_old[:,i])[0]
 
                 
                 #
@@ -174,10 +173,11 @@ class AdversarialGenerator(object):
                 #input(np.diag(y_old[:,y]))
                 #print(np.shape(temp[temp>0])[0]/np.shape(temp)[0])
 
-                
+                y_old[idxs,i] = y_new[idxs]
                 p_pos[idxs,i,:,:] = c_pos[idxs,i,:,:]
                 p_val[idxs,i,:,:] = c_val[idxs,i,:,:]
                 #print("population loop:", str(time.time() - seconds_loop))
+            
         
         # BREAK
         y_pred = np.zeros((B,I))

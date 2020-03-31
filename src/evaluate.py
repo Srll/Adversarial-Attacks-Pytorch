@@ -182,6 +182,7 @@ def evaluate():
         model.preprocess = checkpoint['preprocessing_sequence']
         model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
+        model.GPU(args.gpu)
         print(f'Model trained with {iteration} iterations')
         print(f'Loss at iteration {iteration} -> train: {checkpoint["training_loss"]:.3f} | eval: {checkpoint["evaluation_loss"]:.3f}')
         print(f'Accuracy at iteration {iteration} -> train: {checkpoint["training_accuracy"]:.3f} | eval: {checkpoint["evaluation_accuracy"]:3f}')

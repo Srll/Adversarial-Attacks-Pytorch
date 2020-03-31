@@ -65,7 +65,7 @@ class CNN(torch.nn.Module):
         super(CNN, self).__init__()
         self.network_type = network_type
         self.preprocess = preprocess.PreProcess(preprocess_sequence)
-        
+        self.GPU_enabled = False
 
         if dataset_name == 'speech':
             classes = 10
@@ -92,11 +92,31 @@ class CNN(torch.nn.Module):
         elif self.network_type == 'audio_cdnn':
             self.model = DNN(classes)
             #self.model.fc = torch.nn.Linear(1024,classes)
-
-
+    """
+    def eval(self):
+        self.model.eval()
+    """
+    """
+    def train(self):
+        self.model.train()
+    """
+    def GPU(self, enable):
+        if enable:
+            #if torch.cuda.is_available():
+            self.GPU_enabled = True
+            self.model.cuda()
+            torch.backends.cudnn.benchmark = True
+            #    return
+            #else:
+            #    print("No available CUDA device, running on CPU")
+        else:
+            self.GPU_enabled = False
+            
+            self.model.cpu()
         
     def forward(self, x):
-        
-        temp = self.preprocess.forward(x)
-        return self.model(temp)
-
+        x = self.preprocess.forward(x)
+        if self.GPU_enabled:
+            return self.model(x.cuda()).cpu()
+        else:
+            return self.model(x)

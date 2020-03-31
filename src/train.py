@@ -24,6 +24,7 @@ def train():
     #else:
     
     model = networks.CNN(args.model_name,dataset_name=args.dataset_name,preprocess_sequence=args.preprocessing_model_sequence)
+    model.GPU(args.gpu)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
     dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=6, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)

@@ -302,6 +302,8 @@ def get_args_train():
         help = 'learning rate of the training algorithm (Adam)')
     parser.add_argument('--verbose_rate', type = int, default = 250, 
         help = 'number of iterations to show preliminar results and store the model')
+    parser.add_argument('--gpu', choices = [True,False], default= False,
+        help = 'If True program will use available CUDA device')
     
     # Preprocessing parsing
     parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
@@ -352,6 +354,11 @@ def get_args_evaluate():
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 
         help = 'number of samples in each batch')
+    parser.add_argument('--gpu', dest='gpu', action='store_true',
+        help = 'If flag is present the program will use available CUDA device')
+    parser.set_defaults(feature=False)
+    #parser.add_argument('--gpu', choices = [True, False], default= False,
+    #  
     
     # Preprocessing parsing
     parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
