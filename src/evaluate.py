@@ -22,7 +22,7 @@ figures_path = None
 args = utils.get_args_evaluate()
 
 def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, target_id=3, input_type = 'images'):
-
+    
     accuracy = 0 
     accuracy_adversarial = 0
     loss = 0
@@ -56,6 +56,10 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     elif input_type == 'audio':
         save_audio(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
             path=figures_path, target_name=target_name)
+        
+        #inputs
+        #save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
+        #    path=figures_path, target_name=target_name)
 
 
     loss /= len(dataloader)
@@ -194,7 +198,8 @@ def evaluate():
 
     # evaluate the model 
     input_type = args.model_name.split('_')[0]
-
+    
+    model.eval()
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
 

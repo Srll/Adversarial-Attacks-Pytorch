@@ -26,9 +26,9 @@ def train():
     model = networks.CNN(args.model_name,dataset_name=args.dataset_name,preprocess_sequence=args.preprocessing_model_sequence)
     model.GPU(args.gpu)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
-    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=6, drop_last=True)
+    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=2, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
-    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=6, drop_last=True)
+    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
 
     # prepare the optimization  
     criterion = torch.nn.CrossEntropyLoss()
@@ -89,13 +89,12 @@ def train():
             labels_estimations = model(inputs_adv)
             loss = criterion(labels_estimations, labels)
             loss.backward()
-            #print(loss.grad)
-            #print(model)
-            #print(model.fc1.weight.grad) 
+
             optimizer.step()
             
 
             # Show statistics and percentage
+            model.eval()
             with torch.no_grad():
                 running_loss += loss.item()
                 running_accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
@@ -130,7 +129,7 @@ def train():
                     
                     running_loss = 0.0
                     running_accuracy = 0.0
-
+            model.train()
             iteration += 1
 
 

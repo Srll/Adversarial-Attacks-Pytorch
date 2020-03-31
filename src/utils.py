@@ -8,12 +8,6 @@ import argparse
 import os.path
 import audio_utils 
 
-# Check if filesystem is Unix or Windows
-if '/src' in os.path.dirname(os.path.realpath(__file__)):
-    slash = '/'
-elif '\\src' in os.path.dirname(os.path.realpath(__file__)):
-    slash = '\\'
-
 #####################
 #   Dataset Utils   #
 #####################
@@ -121,7 +115,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
             name_to_label = pickle.load(file)
 
-        self.labels = [name_to_label[v.split(slash)[-2]] for v in self.audio_paths]
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
         
         self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
         self.input_size = input_size
@@ -135,8 +129,6 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 
         audio_path = self.audio_paths[idx]
         fs, audio = wavread(audio_path)
-        
-        
         audio = audio.astype(np.float32)
         
         audio = audio_utils.zeropad(audio, 16384) # 2 seconds
@@ -151,7 +143,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
 class MnistDataset(torch.utils.data.Dataset):
 
     def __init__(self, image_directory, input_size, train=True, transform=None, force=False):
-        #torchvision.datasets.MNIST(image_directory + slash + "mnist", download=True)
+        
 
         create_mnist_dataset_atlas(image_directory)
         with open(os.path.join(image_directory,'mnist_atlas.pkl'), 'rb') as file:
@@ -159,7 +151,7 @@ class MnistDataset(torch.utils.data.Dataset):
         with open(os.path.join(image_directory,'name_to_label.pkl'), 'rb') as file:
             name_to_label = pickle.load(file)
 
-        self.labels = [name_to_label[v.split(slash)[-2]] for v in self.image_paths]
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.image_paths]
         
         self.labels_name = ['0','1','2','3','4','5','6','7','8','9']
         self.input_size = input_size
@@ -183,7 +175,7 @@ class DogsCatsDataset(torch.utils.data.Dataset):
         create_dogs_cats_dataset_atlas(image_directory)
         with open(os.path.join(image_directory,'images_atlas.pkl'), 'rb') as file:
             self.image_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
-        self.labels = [0 if v.split(slash)[-1].split('.')[0] == 'cat' else 1 for v in self.image_paths]
+        self.labels = [0 if v.split(os.sep)[-1].split('.')[0] == 'cat' else 1 for v in self.image_paths]
         self.labels_name = ['cat', 'dog']
         self.input_size = input_size
 
@@ -210,7 +202,7 @@ class SelectedImagenetDataset(torch.utils.data.Dataset):
         with open(os.path.join(image_directory,'name_to_label.pkl'), 'rb') as file:
             name_to_label = pickle.load(file)
 
-        self.labels = [name_to_label[v.split(slash)[-2]] for v in self.image_paths]
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.image_paths]
         
         self.labels_name = ['great white shark', 'flamingo', 'banana', 'strawberry', 'pelican', 'tiger']
         self.input_size = input_size
@@ -282,11 +274,11 @@ def get_args_train():
     )
 
     # Standard parsing
-    parser.add_argument('--images_dir', default = '..'+slash+'Figures'+slash,
+    parser.add_argument('--images_dir', default = '..'+os.sep+'Figures'+os.sep,
         help = 'folder to store the resulting images')
-    parser.add_argument('--models_dir', default = '..'+slash+'Models'+slash,
+    parser.add_argument('--models_dir', default = '..'+os.sep+'Models'+os.sep,
         help = 'folder to store the models') 
-    parser.add_argument('--datasets_dir', default = '..'+slash+'Datasets'+slash,
+    parser.add_argument('--datasets_dir', default = '..'+os.sep+'Datasets'+os.sep,
         help = 'folder where the datasets are stored') 
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
@@ -302,8 +294,8 @@ def get_args_train():
         help = 'learning rate of the training algorithm (Adam)')
     parser.add_argument('--verbose_rate', type = int, default = 250, 
         help = 'number of iterations to show preliminar results and store the model')
-    parser.add_argument('--gpu', choices = [True,False], default= False,
-        help = 'If True program will use available CUDA device')
+    parser.add_argument('--gpu', dest='gpu', action='store_true',
+        help = 'If flag is present the program will use available CUDA device')
     
     # Preprocessing parsing
     parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
@@ -340,11 +332,11 @@ def get_args_evaluate():
     )
 
     # Standard parsing
-    parser.add_argument('--images_dir', default = '..'+slash+'Figures'+slash,
+    parser.add_argument('--images_dir', default = '..'+os.sep+'Figures'+os.sep,
         help = 'folder to store the resulting images')
-    parser.add_argument('--models_dir', default = '..'+slash+'Models'+slash,
+    parser.add_argument('--models_dir', default = '..'+os.sep+'Models'+os.sep,
         help = 'folder to store the models') 
-    parser.add_argument('--datasets_dir', default = '..'+slash+'Datasets'+slash,
+    parser.add_argument('--datasets_dir', default = '..'+os.sep+'Datasets'+os.sep,
         help = 'folder where the datasets are stored') 
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
