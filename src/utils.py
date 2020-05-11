@@ -23,8 +23,8 @@ def create_speech_commands_dataset_atlas(directory, force=False):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
 
-            paths['train'] += path_names[:int(len(path_names)*0.99)]
-            paths['validation'] += path_names[int(len(path_names)*0.99):]
+            paths['train'] += path_names[:int(len(path_names)*0.8)]
+            paths['validation'] += path_names[int(len(path_names)*0.998):]
         
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -302,7 +302,7 @@ def get_args_train():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'GL'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -358,8 +358,9 @@ def get_args_evaluate():
             'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
+    # Adversarial attack parsing 
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL'
         ], default = 'FGSM_vanilla',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
