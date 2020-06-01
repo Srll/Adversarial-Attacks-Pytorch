@@ -1,6 +1,7 @@
 import os, shutil, pickle
 import torch, torchvision
 import numpy as np 
+import pydub
 from skimage import io as skio
 from skimage import transform as sktransform
 from scipy.io.wavfile import read as wavread
@@ -34,6 +35,24 @@ def create_speech_commands_dataset_atlas(directory, force=False):
         with open(os.path.join(directory,'name_to_label.pkl'), 'wb') as file:
             pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
 
+def create_FMA_small_dataset_atlas(directory, force=False):
+    if not os.path.isfile(os.path.join(directory,'audio_atlas.pkl')):
+        paths = {'train': list(), 'validation': list()}
+        for class_name in os.listdir(directory):
+            folder_name = os.path.join(directory, class_name)
+            path_names = [os.path.join(folder_name,v) for v in os.listdir(folder_name)]
+
+            paths['train'] += path_names[:int(len(path_names)*0.99)]
+            paths['validation'] += path_names[int(len(path_names)*0.99):]
+
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
+            pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
+    
+    if not os.path.isfile(os.path.join(directory,'name_to_label.pkl')):
+        name_to_label = {'Electronic':0, 'Experimental':1, 'Folk':2, 'Hip-Hop':3, 'Instrumental':4, 'International':5, 'Pop':6, 'Rock':7}
+        with open(os.path.join(directory,'name_to_label.pkl'), 'wb') as file:
+            pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
+        
 def create_mnist_dataset_atlas(directory, force=False):
     
     
@@ -46,7 +65,7 @@ def create_mnist_dataset_atlas(directory, force=False):
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
             paths['train'] += path_names[:int(len(path_names)*0.99)]
             paths['validation'] += path_names[int(len(path_names)*0.99):]
-            print(class_name)
+            
 
         with open(os.path.join(directory,'mnist_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -104,6 +123,35 @@ def create_imagenet_dataset_atlas(image_directory):
         with open(os.path.join(image_directory,'name_to_label.pkl'), 'wb') as file:
             pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
 
+class FMAsmallDataset(torch.utils.data.Dataset):
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+        create_FMA_small_dataset_atlas(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+        
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['Electronic', 'Experimental', 'Folk', 'Hip-Hop', 'Instrumental', 'International', 'Pop', 'Rock']
+        self.input_size = input_size
+        
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        
+        audio_path = self.audio_paths[idx]
+        
+        
+        audio_object = pydub.AudioSegment.from_mp3(audio_path)
+        audio = np.array(audio_object.get_array_of_samples())
+        audio = audio.astype(np.float32)
+        
+        audio = audio_utils.zeropad(audio, int(2644992/3))
+        label = self.labels[idx]
+        
+        return audio, label
 
 class SpeechCommandDataset(torch.utils.data.Dataset):
 
@@ -135,6 +183,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         #audio = audio_utils.zeropad(audio, 32000) # 4 seconds
         
         label = self.labels[idx]
+        
         return audio, label
 
 class MnistDataset(torch.utils.data.Dataset):
@@ -238,6 +287,8 @@ def get_dataset(dataset_name, dataset_path, input_size = 28, train = True):
         return SelectedImagenetDataset(dataset_path, input_size, train)
     elif dataset_name == 'mnist':
         return MnistDataset(dataset_path, input_size, train)
+    elif dataset_name == 'FMA_small':
+        return FMAsmallDataset(dataset_path, input_size, train)
 
 def convert_to_rgb(im):
     dims = len(im.shape)
@@ -277,10 +328,10 @@ def get_args_train():
         help = 'folder to store the models') 
     parser.add_argument('--datasets_dir', default = '..'+os.sep+'Datasets'+os.sep,
         help = 'folder where the datasets are stored') 
-    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
+    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ', 'audio_RNN'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--n_iterations', type = int, default = 2000, 
@@ -335,10 +386,10 @@ def get_args_evaluate():
         help = 'folder to store the models') 
     parser.add_argument('--datasets_dir', default = '..'+os.sep+'Datasets'+os.sep,
         help = 'folder where the datasets are stored') 
-    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist'], default = 'imagenet', 
+    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ', 'audio_RNN'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 

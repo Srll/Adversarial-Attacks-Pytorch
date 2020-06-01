@@ -26,7 +26,7 @@ def train():
     model = networks.CNN(args.model_name,dataset_name=args.dataset_name,preprocess_sequence=args.preprocessing_model_sequence)
     model.GPU(args.gpu)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
-    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=2, drop_last=True)
+    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
     dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
 
@@ -35,7 +35,6 @@ def train():
     params_to_update = []
     for name,param in model.named_parameters():
         if param.requires_grad == True:
-            print(name)
             params_to_update.append(param)
     learning_rate = args.learning_rate
     
@@ -77,6 +76,8 @@ def train():
             
             inputs = inputs.type(torch.FloatTensor)
             labels = labels.type(torch.LongTensor)
+
+            
             
             optimizer.zero_grad()
             inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
@@ -87,6 +88,7 @@ def train():
             
             model.zero_grad()
             labels_estimations = model(inputs_adv)
+            print(labels_estimations.shape)
             loss = criterion(labels_estimations, labels)
             loss.backward()
 
