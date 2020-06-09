@@ -49,20 +49,23 @@ class PreProcess():
             self.transforms_inverse.append(valid_transforms[transform][1]) # add their corresponding "inverse" to inverse list
         self.transforms_inverse.reverse() 
 
+
     def forward(self, x):
+        if torch.is_tensor(x):
+            x = x.numpy()
         
-        x = x.numpy()
         for t in self.transforms_forward:
             x = t(x)
         
         return torch.from_numpy(x).to(torch.float32)
 
     def inverse(self, x):
-        x = x.numpy()
+        if torch.is_tensor(x):
+            x = x.numpy()
         
         for t in self.transforms_inverse:
             x = t(x)
-        
+        x = int(x*2^16)/(2^16) # quantize to 16 bit
         return torch.from_numpy(x).to(torch.float32)
 
     
@@ -83,11 +86,15 @@ class PreProcess():
 
     # Preprocessing methods
     def normalize(self, x):
-        x = x / self.kwargs.get('max_value')
+        self.mean = np.mean(x, axis=1)
+        self.std = np.std(x, axis=1)
+        x = ((x.T - self.mean) / self.std).T
+        
         return x
 
     def inormalize(self, x):
-        x = x * self.kwargs.get('max_value')
+        x = (x.T * self.std + self.mean).T
+        #x = x * self.kwargs.get('max_value')
         return x
 
     def dummy(self, x):
@@ -111,7 +118,7 @@ class PreProcess():
 
 
     def mag2db(self, x):
-        #TODO fix divison by 0
+        
         x[x == 0] = np.finfo(float).eps
         return 20 * np.log10(x)
     
@@ -193,7 +200,7 @@ class PreProcess():
         x = self.istft(s)
         return x
     
-
+    
     def MFCC(self, x): # TODO
         def f_to_m(f):
             return 2595 * np.log10(1 + f/700)
@@ -248,6 +255,7 @@ class PreProcess():
         import pdb; pdb.set_trace()
 
         return 
+    
 
     def iMFCC(self, x):
 
@@ -307,7 +315,6 @@ class PreProcess():
         return x
 
     def dbg(self, x):
-        self.get_masking_threshold(x)
         
         import pdb
         pdb.set_trace()

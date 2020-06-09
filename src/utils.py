@@ -42,8 +42,8 @@ def create_FMA_small_dataset_atlas(directory, force=False):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v in os.listdir(folder_name)]
 
-            paths['train'] += path_names[:int(len(path_names)*0.99)]
-            paths['validation'] += path_names[int(len(path_names)*0.99):]
+            paths['train'] += path_names[:int(len(path_names)*0.90)]
+            paths['validation'] += path_names[int(len(path_names)*0.90):]
 
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -148,7 +148,8 @@ class FMAsmallDataset(torch.utils.data.Dataset):
         audio = np.array(audio_object.get_array_of_samples())
         audio = audio.astype(np.float32)
         
-        audio = audio_utils.zeropad(audio, int(2644992/3))
+        #audio = audio_utils.zeropad(audio, int(2644992/3)) # 10 seconds
+        audio = audio_utils.zeropad(audio, int(2644992/12)) # 2.5 seconds
         label = self.labels[idx]
         
         return audio, label

@@ -88,7 +88,7 @@ def train():
             
             model.zero_grad()
             labels_estimations = model(inputs_adv)
-            print(labels_estimations.shape)
+
             loss = criterion(labels_estimations, labels)
             loss.backward()
 
