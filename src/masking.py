@@ -3,78 +3,121 @@ import numpy as np
 from scipy import signal
 from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
+from scipy.linalg import toeplitz
+
+from graphics import get_audio
+#_, audio = get_audio.get_audio_speech()
+#audio = signal.resample(audio, int(audio.shape[0]*2.75))
+#_, audio = get_audio.get_audio_sin()
 
 
+NEGATIVE_INF = np.NINF
 
-# returns same shaped mask as x
-def get_mask_batches(x, z, fs, N_bins):
+def get_mask_batch(x):
+    mask = []
+    for b in range(x.shape[0]): # iterate batches
+        mask.append(get_masking_threshold(x[b]))
+
+    return np.stack(mask)
+
+
+def get_tonal_maskers(P_n):
+    P_TM = np.zeros(P_n.shape) + NEGATIVE_INF
+    P_TM_lm = signal.argrelextrema(P_n, np.greater, axis=0)[0] # get index of all local maximas
     
+    for idx in P_TM_lm:
+        masker = True
+        if 1 < idx < 62: # check what bark range to use
+            dk_l = [-2, 2]
+        elif 61 < idx < 127:
+            dk_l = [-3,-2, 2, 3]
+        elif 126 < idx < 249:
+            dk_l = [-6,-5,-4,-3,-2,2,3,4,5,6]
+        else:
+            masker = False
+            dk_l = []
+        
+        for dk in dk_l:
+            if P_n[idx] - P_n[idx+dk] <= 7:
+                masker = False
+                break
+
+        if masker == True:
+            P_TM[idx] = mag2db(db2mag(P_n[idx-1]) + db2mag(P_n[idx]) + db2mag(P_n[idx+1]))
+        
+    return P_TM
+
+def get_nontonal_maskers(P_n, CB, exclude_idx, f_steps):
     
-    m = z.copy()
-    for b in range(x.shape[0]):
-        print(b)
-        m[b] = resample_to_hz(get_masking_threshold(x[b]), N_bins, fs, z)
-    return m
-
-
-
-
-def resample_to_hz(mask_in_bark, N_hz, fs, z):
-    f = np.linspace(1, fs/2, N_hz)
-    bark = f_to_bark(f)
-    mask_in_hz = np.zeros((N_hz, mask_in_bark.shape[1]))
-
+    NR_BINS = len(CB) - 1
+    NM = np.zeros((NR_BINS))
     
-    mask_in_bark = np.nan_to_num(mask_in_bark, 0.0001)
-
-    for t in range(mask_in_bark.shape[1]):
-        interp = interp1d(np.linspace(0,25,mask_in_bark[:,t].shape[0]),mask_in_bark[:,t]) # TODO check if this linspace is accurate
-        mask_in_hz[:,t] = interp(bark)
-
-    return mask_in_hz
-
+    for n in range(NR_BINS):
+        low = CB[n] 
+        high = CB[n + 1]
+        
+        idxs = np.logical_and(np.array([f_steps - low >= 0]), np.array([f_steps - high < 0]))[0]
+        idxs[exclude_idx] = False
     
+        NM[n] = np.sum(db2mag(P_n[idxs]))
+    return mag2db(NM)
 
-def mag2db(x_):
-    x_[x_ == 0] = np.finfo(float).eps
-    return 10 * np.log10(x_)
+def quiet_threshold(f):
+    # output is in dB
+    if np.isscalar(f):
+        if f == 0:
+            f = np.finfo(float).eps
+    else:
+        f[f==0] = np.finfo(float).eps
 
-def db2mag(x_):
-    return np.power(10, x_/10)
+    threshold = 3.64*np.power(f/1000, -0.8) \
+        - 6.5 * np.exp(-0.6*(np.square((f/1000) - 3.3))) \
+        + 1e-3 * np.power(f/1000, 4)
+    return threshold
+
+def TM_offset_db(masker):
+    return -6.025 - 0.275*masker
+
+def NM_offset_db(masker):
+    return -2.025 - 0.175*masker
+
+
+def spreading_function_db(masker, maskee, val):
+    dz = masker - maskee
+    if -3 < dz < -1:
+        SF_db = 17*dz - 0.4 * val + 11
+    elif -1 < dz < 0:
+        SF_db = (0.4*val +6) * dz
+    elif 0 < dz < 1:
+        SF_db = -17*dz
+    elif 1 < dz < 8:
+        SF_db = -17*dz+0.15 *val*(dz-1)
+    else:
+        SF_db = 0
+    return SF_db
+
+
+def mag2db(x):
+    if np.isscalar(x):
+        if x == 0:
+            return np.finfo(float).eps
+        return 10 * np.log10(x)
+    else:
+        x[x == 0] = np.finfo(float).eps
+        return 10 * np.log10(x)
+
+def db2mag(x):
+    return np.power(10, x/10)
 
 
 def f_to_bark(f):
-    #return 6 * np.arcsinh(f/600)
-    return 13*np.arctan(0.76*f / 1000) + 3.5*np.square(np.arctan(f/7500)) # TODO use this one 
+    return 13*np.arctan(0.76*f / 1000) + 3.5*np.square(np.arctan(f/7500))
 
-def bark_to_f(bark):
-    return 600 * np.sinh(bark/6)
+def get_masking_threshold(x):   
+    Fs = 44100
+    CB_f = [0,100,200,300,400,510,630,770,920, 1080,1270,1480,1720,2000,2320,2700,3150, 3700,4400,5300,6400,7700,9500,12000,15500]
+    CB_f_mean = np.array([(CB_f[i] + CB_f[i+1])/2 for i in range(len(CB_f)-1)])
     
-
-def get_masking_threshold(x):
-
-
-    def quiet_threshold(f):
-        # output is in dB
-        f[f==0] = np.finfo(float).eps
-        threshold = 3.64*np.power(f/1000, -0.8) \
-            - 6.5 * np.exp(-0.6*(np.square((f/1000) - 3.3))) \
-            + 1e-3 * np.power(f/1000, 4)
-        return threshold
-
-    def local_maximas(p):
-        # returns index of all local extrema over frequency axis
-        return np.stack(signal.argrelextrema(p, np.greater, axis=0), axis=-1) 
-
-
-    # critical bands over frequency spectrum
-    CB_f = [0,100,200,300,400,510,630,770,920, \
-            1080,1270,1480,1720,2000,2320,2700,3150, \
-            3700,4400,5300,6400,7700,9500,12000,15500]
-
-
-    fs = 16000
-
     # constants
     N = 512
 
@@ -84,217 +127,126 @@ def get_masking_threshold(x):
     n = np.arange(N)
     w = np.sqrt(8/3) * (1/2) * (1 - np.cos(2*np.pi*n/N))
 
-    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=fs, noverlap=N/2)
-    bark_steps = f_to_bark(f_steps)
+    
 
-    S_ = np.square(np.abs(S))
-    S_[S_==0] = np.finfo(float).eps
-    PSD = 10 * np.log10(S_)
-    P = 96 - np.max(PSD) + PSD # should this be over one FFT or over STFT?
+    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=Fs, noverlap=N/2)
+    bark_steps = f_to_bark(f_steps)
+    max_bark = min(np.max(bark_steps), 25)
+
+    S = np.square(np.abs(S))
+    S[S==0] = np.finfo(float).eps
+    PSD = 10 * np.log10(S)
+    P = 96 - np.max(PSD) + PSD
+
+    
+    #MASK_256 = np.zeros(P.shape[0])
+    
+    MASK_32 = np.zeros((32, P.shape[1]))
+    #MASK_db = np.zeros(P.shape) - NEGATIVE_INF
 
     # ============================= STEP 2 =============================
+    # perform same analysis on every time step
     for t_idx in range(t_steps.shape[0]):
-        P_lm = local_maximas(P)
         
-        S_TM = []
-        for i in range(P_lm.shape[0]):
-            masker = True
-            if 1 < P_lm[i][0] < 62: # check what bark range to use
-                dk_l = [-2, 2]
-            elif 61 < P_lm[i][0] < 127:
-                dk_l = [-3,-2,2, 3]
-            elif 126 < P_lm[i][0] < 249:
-                dk_l = [-6,-5,-4,-3,-2, 2,3,4,5,6]
-            else:
-                masker = False
-                dk_l = []
+        P_n = P[:,t_idx]
+
+        P_TM = get_tonal_maskers(P_n) # 257 bins with only tonal maskers Power remaining
+        exclude_idx = np.where(P_TM > NEGATIVE_INF)[0]
+        
+        P_NM = get_nontonal_maskers(P_n, CB_f, exclude_idx,f_steps) # 24 bins of nontonal maskers
+        
+        # ========================= STEP 3 ===============================
+        # remove maskers weaker then the hearing threshold in quiet
+        P_quiet_TM = quiet_threshold(f_steps)
+        P_TM[P_TM < P_quiet_TM] = NEGATIVE_INF
+        
+        P_quiet_NM = quiet_threshold(CB_f_mean)
+        P_NM[P_NM < P_quiet_NM] = NEGATIVE_INF
+
+
+        # remove weak maskers within 0.5 bark
+        TM = [P_TM>NEGATIVE_INF]
+        bark_of_max_TM = f_to_bark(f_steps[TM])
+        bark_of_NM = f_to_bark(CB_f_mean)  
+        for k, bark in enumerate(bark_of_max_TM):
+            # check closest TM
+            TM_val = P_TM[TM][k]
+            TM_val_within_range = np.where(np.abs(bark - bark_of_max_TM) < 0.5)[0] # all of these lay within 0.5 bark
             
-            for dk in dk_l:
-
-
-                if P[P_lm[i][0],P_lm[i][1]] - P[P_lm[i][0]+dk,P_lm[i][1]] <= 7:
-                    masker = False
-
-                    break
-                
-
-            if masker == True:
-                S_TM.append([P_lm[i][0],P_lm[i][1]])
-
-
-    S_TM = np.asarray(S_TM)
-
-    P_TM = mag2db(db2mag(P[S_TM[:,0]-1, S_TM[:,1]]) + db2mag(P[S_TM[:,0], S_TM[:,1]]) + db2mag(P[S_TM[:,0]-1, S_TM[:,1]]))
-
-
-    #P_TM = 10*np.log10(np.power(10,/10) \
-    #                    + np.power(10,/10) \
-    #                    + np.power(10,/10))
-    
-    """
-    plt.plot(S_TM[S_TM[:,1]==4][:,0], P_TM[S_TM[:,1]==4],'ro')
-    plt.plot(P[:,4])
-    plt.show()
-    """
-
-    bins_e = np.zeros((len(CB_f), S.shape[1]))
-    cb_l = 0
-    
-    for i, cb_h in enumerate(CB_f):
-        bin_sum  = np.zeros(S.shape[1])
-        for f_idx in range(f_steps.shape[0]):
-            f = f_steps[f_idx]
-            if (cb_h<f):
-                bins_e[i] = mag2db(bin_sum)
-                break
-            elif(cb_l<f):
-                bin_sum += db2mag(P[f_idx,:])
-        cb_l = cb_h
-
-    
-    bins_f = np.zeros(len(CB_f) + 1)
-    
-    bark_list = (bark_steps//1).astype(int).tolist()
-    for i,idx in enumerate(bark_list):
-        bins_f[idx] += np.log10(f_steps[i]+np.finfo(float).eps) # fix log10(0)
-    
-    
-    
-    bins_f[np.unique(bark_list, return_counts=True)[0]] /= np.unique(bark_list, return_counts=True)[1]
-    bins_f = np.power(10, bins_f)
-
-    #bins_f = np.power(10, bins_f)
-    #bins_f = db2mag(bins_f)
-
-    """
-    plt.plot(f_steps[S_TM[S_TM[:,1]==4][...,0]], P_TM[S_TM[:,1]==4],'go')
-    plt.plot(bins_f[:-1], bins_e[:,4],'ro')
-    plt.plot(f_steps,P[:,4])
-    plt.show()
-    """
-    
-
-
-    
-
-    # ============================= STEP 3 =============================
-    
-    # check if SPL is higher then quiet threshold
-    P_NM_idx = (quiet_threshold(bins_f[:-1]) < bins_e.T).T  # noise
-    P_NM = np.zeros((25,S.shape[1]))  # TODO add constant -inf ?
-    P_NM[P_NM_idx == True] = bins_e[P_NM_idx]
-
-    
-    P_TM_idx = quiet_threshold(f_steps[S_TM[...,0]]) < P_TM   # tonal
-    S_TM = S_TM[P_TM_idx]
-
-    
-    pop_idx = []
-    for i in range(S.shape[1]):
-        # bark of max values at time = i 
-        bark_of_max = f_to_bark(f_steps[S_TM[i == S_TM[...,1]][...,0]])
-        bark_diff = np.diff(bark_of_max)
-        for k, diff in enumerate(bark_diff):
-            if diff <= 0.5 and k<len(bark_diff) -1:
-                # check which max to keep
-                try:
-                    value1 = P[ S_TM[i == S_TM[...,1]][...,0][k],S_TM[i == S_TM[...,1]][...,1][k]  ]
-                    value2 = P[ S_TM[i == S_TM[...,1]][...,0][k+1],S_TM[i == S_TM[...,1]][...,1][k+1]  ]
-                except:
-                    import pdb; pdb.set_trace()
-                if value1 > value2:
-                    # add idx to pop list 
-                    pop_idx.append([S_TM[i == S_TM[...,1]][...,0][k],i])
-                else:
-                    pop_idx.append([S_TM[i == S_TM[...,1]][...,0][k+1],i])
-    
-    
-    pop_list = []
-    for idx in pop_idx:
-        for i in np.where(S_TM[...,0] == idx[0])[0].tolist():
-            if S_TM[i][1] == idx[1]:
-                pop_list.append(i)
-
-    S_TM = np.delete(S_TM, pop_list, 0)
-    P_TM = np.delete(P_TM, pop_list, 0)
-    """
-    plt.plot(f_steps[S_TM[S_TM[:,1]==4][...,0]], P_TM[S_TM[:,1]==4],'go')
-    plt.plot(bins_f[:-1], bins_e[:,4],'ro')
-    plt.plot(f_steps,P[:,4])
-    plt.show()
-    """
-
-
-    #f_to_bark(f_steps[S_TM[P_TM_idx][...,0]])
-
-
-    # ============================= STEP 4 =============================
-    nr_maskees = 106
-    maskees = 25*np.arange(1,nr_maskees+1)/nr_maskees
-    mask_frame_TM = np.zeros((nr_maskees, S.shape[1]))
-
-    mask_frame_NM = np.zeros((nr_maskees, S.shape[1]))
-    
-    for i in range(np.minimum(S_TM.shape[0], P_TM.shape[0])):
-        
-        try:
-            value  = P_TM[i]
-            idxs = S_TM[i]
-        except:
-            import pdb; pdb.set_trace()
-
-
-        idx_bark   = f_to_bark(f_steps[idxs[0]])
-        for j in range(maskees.shape[0]):
-            dz = maskees[j] - idx_bark
-            if -3 < dz < -1:
-                SF_db = 17*dz - 0.4 * value + 11
-            elif -1 < dz < 0:
-                SF_db = (0.4*value +6) * dz
-            elif 0 < dz < 1:
-                SF_db = -17*dz
-            elif 1 < dz < 8:
-                SF_db = -17*dz+0.15 *value*(dz-1)
-            else:
-                SF_db = -10000 # TODO
+            # TODO start with strongest
             
-            mask_frame_TM[j, idxs[1]] += db2mag(SF_db -6.025 - 0.275*maskees[j] + value)
-    mask_frame_TM = mag2db(mask_frame_TM)
-    
-    for i in range(P_NM.shape[0]):
-        values  = P_NM[i]
-        source_bark = i
-        for k in range(values.shape[0]):
-            value = values[k]
-            for j in range(maskees.shape[0]):
-                dz = maskees[j] - source_bark 
-                if -3 < dz < -1:
-                    SF_db = 17*dz - 0.4 * value + 11
-                elif -1 < dz < 0:
-                    SF_db = (0.4*value +6) * dz
-                elif 0 < dz < 1:
-                    SF_db = -17*dz
-                elif 1 < dz < 8:
-                    SF_db = -17*dz+0.15 *value*(dz-1)
-                else:
-                    SF_db = -10000 # TODO
-                # TODO not sure about this summation, is everything in dB?
-                #mask_frame_NM[i, k] += np.power(10, (np.power(10,SF_db/10) -6.025 - 0.275*maskees[j] + value)/10)
-                mask_frame_NM[j, k] += db2mag(SF_db -2.025 - 0.175*maskees[j] + value)
-    mask_frame_NM = mag2db(mask_frame_NM)
-    
-    L_G = mag2db(db2mag(mask_frame_TM) + db2mag(mask_frame_NM))
-    """
-    plt.plot(maskees,L_G[:,10])
-    plt.plot(maskees,mask_frame_NM[:,10])
-    plt.plot(maskees,mask_frame_TM[:,10])
-    plt.plot(maskees,P[:,10])
-    plt.show()
-    """
-    
-    # ============================= STEP 5 =============================
+            # compare TM_val to all within 0.5 bark range
+            for idx in TM_val_within_range:
+                if TM_val < P_TM[TM][idx]:
+                    P_TM[TM][k] = NEGATIVE_INF
+            
 
-    return L_G
 
+            # also check closest NM (we only look at closest since we know these are spread ~1 bark apart)
+            # TODO make sure within 0.5 bark
+            NM_idx = np.argmin(np.abs(bark_of_NM - bark))
+            NM_val = P_NM[NM_idx]
+            if TM_val < NM_val:
+                P_TM[TM][idx] = NEGATIVE_INF
+            else:
+                P_NM[NM_idx] = NEGATIVE_INF
+
+            # TODO check that masker is stronger then quiet
         
+        # ========================= STEP 4 ===============================
+        
+    
+        MASK_106 = np.zeros((106))
+        
+        maskees = list(range(0,48,1))
+        maskees.extend(list(range(48,96,2)))
+        maskees.extend(list(range(96,232,4)))
+        maskees_hz = np.array(maskees)*Fs/2/256
 
+        maskees_bark = f_to_bark(maskees_hz)
+
+        #import pdb; pdb.set_trace()
+        for k, maskee_bark in enumerate(maskees_bark):
+            # get TM for k
+            for idx in np.where(P_TM>NEGATIVE_INF)[0]:
+                masker_bark = f_to_bark(idx * Fs/2 * 256)
+                if (masker_bark - maskee_bark < 8) and (masker_bark - maskee_bark > -3):               
+                    MASK_106[k] += db2mag(P_TM[idx]
+                                + TM_offset_db(masker_bark)
+                                + spreading_function_db(masker_bark, maskee_bark, P_TM[idx]))
+            
+            # get NM for k
+            for idx in np.where(P_NM>NEGATIVE_INF)[0]:
+                masker_bark = bark_of_NM[idx]
+                if (masker_bark - maskee_bark < 8) and (masker_bark - maskee_bark > -3):
+                    contribution = db2mag(P_NM[idx]
+                                + NM_offset_db(masker_bark)
+                                + spreading_function_db(masker_bark, maskee_bark, P_NM[idx]))
+
+                    MASK_106[k] += contribution
+                    
+
+        # get threshold in quiet for k
+        MASK_106 += db2mag(quiet_threshold(maskees_hz))
+            
+        # ========================= STEP 5 ===============================
+        MASK_106 = mag2db(MASK_106)
+        #MASK_106[0] = 0
+        # ========================= STEP 6 ===============================
+        # pick out min from each subband
+
+        MASK_32[0:6,t_idx] = np.min(np.reshape(MASK_106[0:48],(6,8)), axis=1)
+        MASK_32[6:12,t_idx] = np.min(np.reshape(MASK_106[48:72],(6,4)), axis=1)
+        MASK_32[12:29,t_idx] = np.min(np.reshape(MASK_106[72:106],(17,2)), axis=1)
+        MASK_32[29:,t_idx] = MASK_106[105]
+        
+        #plt.plot(f_steps,P_n)
+        #plt.plot(Fs/2/32*np.linspace(0,32,32),MASK_32[:,t_idx])
+        #plt.plot(f_steps[1:],quiet_threshold(f_steps[1:]))
+        #plt.show()
+        MASK_32[MASK_32 > 96] = 96
+    return MASK_32
+
+
+#get_masking_threshold(audio[8000:])
+#get_masking_threshold(audio[8000:])

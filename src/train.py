@@ -23,7 +23,7 @@ def train():
     #    model = networks.Simple_dense(10)
     #else:
     
-    model = networks.CNN(args.model_name,dataset_name=args.dataset_name,preprocess_sequence=args.preprocessing_model_sequence)
+    model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
     model.GPU(args.gpu)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
     dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
@@ -53,10 +53,10 @@ def train():
     bar = progressbar.ProgressBar(max_value=100)
 
     # load the checkpoint, if any 
-    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocessing_model_sequence) + '.chkpt')
+    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
-        model.preprocess = checkpoint['preprocessing_sequence']
+        #model.preprocess = checkpoint['preprocessing_sequence']
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         iteration = checkpoint['iteration'] + 1
@@ -67,7 +67,7 @@ def train():
         print(f'Starting the model at iteration {iteration + 1}')
 
     # prepare adversary
-    adversary = adversaries.AdversarialGenerator(model,criterion,args.preprocessing_adversarial_sequence) 
+    adversary = adversaries.AdversarialGenerator(model,criterion) 
     
     bar = progressbar.ProgressBar(max_value=n_iterations_show)
     # train the model
@@ -118,7 +118,6 @@ def train():
                     print(f'Accuracy at iteration {iteration+1} -> train: {running_accuracy/n_iterations_show:.3f} | eval: {accuracy_eval/len(dataloader_eval):.3f}')
 
                     torch.save({
-                        'preprocessing_sequence': model.preprocess,
                         'iteration': iteration,
                         'model_state_dict': model.state_dict(), 
                         'optimizer_state_dict': optimizer.state_dict(),

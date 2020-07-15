@@ -54,7 +54,7 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
             path=figures_path, target_name=target_name)
     elif input_type == 'audio':
-        save_audio(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
+        save_audio(inputs.detach(), adversarial_noise.detach(), inputs_adversarial.detach(), labels.detach(), labels_estimations.detach(), labels_estimations_adversarial.detach(), 
             path=figures_path, target_name=target_name)
         
         #inputs
@@ -131,7 +131,6 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
     plt.savefig(os.path.join(path,body + 'resulting_image' + tail + '.png'),format='png')
 
 def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
-    
     for i in range (x.shape[0]):
         divider = torch.max(x[i] + adv_noise[i] + x_adv[i]) # TODO fix this    
         scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'.wav'), 16000, (x[i]/divider).numpy())
@@ -165,25 +164,32 @@ def evaluate():
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name 
     models_path = args.models_dir + args.dataset_name 
+    # adversary_models_path = args.models_dir + args.dataset_name 
     
     global figures_path
     figures_path = args.images_dir + args.dataset_name
-    model = networks.CNN(args.model_name,dataset_name=args.dataset_name, preprocess_sequence=args.preprocessing_model_sequence)
+    model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
+    
+    if args.adversary_model_name != 'none':
+        adversary_model = networks.CNN(args.adversary_model_name,dataset_name=args.dataset_name)
+    else: # use same model for generating adversaries and evaluating
+        adversary_model = model
+    
+    # adversary_model = networks.CNN(args.model_name,dataset_name=args.dataset_name, preprocess_sequence=args.preprocessing_model_sequence)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
     dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
     dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     labels_name = dataset_eval.labels_name
-
+    
     # obtain the criterion used for training 
     global criterion
     criterion = torch.nn.CrossEntropyLoss()
 
     # load the checkpoint, if any 
-    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '_' + utils.simple_hash(args.preprocessing_model_sequence) + '.chkpt')
+    checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
-        model.preprocess = checkpoint['preprocessing_sequence']
         model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
         model.GPU(args.gpu)
@@ -191,19 +197,28 @@ def evaluate():
         print(f'Loss at iteration {iteration} -> train: {checkpoint["training_loss"]:.3f} | eval: {checkpoint["evaluation_loss"]:.3f}')
         print(f'Accuracy at iteration {iteration} -> train: {checkpoint["training_accuracy"]:.3f} | eval: {checkpoint["evaluation_accuracy"]:3f}')
 
+    checkpoint_path_adversary_model = os.path.join(models_path, args.adversary_model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
+    if os.path.isfile(checkpoint_path_adversary_model):
+        checkpoint = torch.load(checkpoint_path_adversary_model)
+        adversary_model.load_state_dict(checkpoint['model_state_dict'])
+        iteration = checkpoint['iteration'] + 1
+        model.GPU(args.gpu)
+        print(f'Adversary Model trained with {iteration} iterations')
+        print(f'Loss at iteration {iteration} -> train: {checkpoint["training_loss"]:.3f} | eval: {checkpoint["evaluation_loss"]:.3f}')
+        print(f'Accuracy at iteration {iteration} -> train: {checkpoint["training_accuracy"]:.3f} | eval: {checkpoint["evaluation_accuracy"]:3f}')
+
+    # set models to evaluation mode
+    model.eval()
+    adversary_model.eval()
+
     # generate the adversary
-    #global adversary
-    adversary = adversaries.AdversarialGenerator(model,criterion,args.preprocessing_adversarial_sequence)
-
-
+    adversary = adversaries.AdversarialGenerator(adversary_model,criterion)
+    
     # evaluate the model 
     input_type = args.model_name.split('_')[0]
     
-    model.eval()
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
-
-
 
 if __name__ == "__main__":
     evaluate()

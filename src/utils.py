@@ -24,8 +24,8 @@ def create_speech_commands_dataset_atlas(directory, force=False):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
 
-            paths['train'] += path_names[:int(len(path_names)*0.8)]
-            paths['validation'] += path_names[int(len(path_names)*0.998):]
+            paths['train'] += path_names[:int(len(path_names)*0.85)]
+            paths['validation'] += path_names[int(len(path_names)*0.995):]
         
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -42,8 +42,8 @@ def create_FMA_small_dataset_atlas(directory, force=False):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v in os.listdir(folder_name)]
 
-            paths['train'] += path_names[:int(len(path_names)*0.90)]
-            paths['validation'] += path_names[int(len(path_names)*0.90):]
+            paths['train'] += path_names[:int(len(path_names)*0.85)]
+            paths['validation'] += path_names[int(len(path_names)*0.85):]
 
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -63,8 +63,8 @@ def create_mnist_dataset_atlas(directory, force=False):
         for class_name in os.listdir(directory):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
-            paths['train'] += path_names[:int(len(path_names)*0.99)]
-            paths['validation'] += path_names[int(len(path_names)*0.99):]
+            paths['train'] += path_names[:int(len(path_names)*0.85)]
+            paths['validation'] += path_names[int(len(path_names)*0.85):]
             
 
         with open(os.path.join(directory,'mnist_atlas.pkl'), 'wb') as file:
@@ -180,8 +180,8 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         fs, audio = wavread(audio_path)
         audio = audio.astype(np.float32)
         
-        audio = audio_utils.zeropad(audio, 16384) # 2 seconds
-        #audio = audio_utils.zeropad(audio, 32000) # 4 seconds
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
         
         label = self.labels[idx]
         
@@ -332,7 +332,7 @@ def get_args_train():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ', 'audio_RNN'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ', 'audio_conv2d_mfcc',  'audio_conv2d_spectrogram'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--n_iterations', type = int, default = 2000, 
@@ -347,14 +347,16 @@ def get_args_train():
         help = 'If flag is present the program will use available CUDA device')
     
     # Preprocessing parsing
-    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
+    """
+    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = ['None'], 
         help = 'sequence of preprocessing steps')
-    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = [None], 
+    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = ['None'], 
         help = 'sequence of preprocessing steps')
+    """
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'GL'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'GL', 'GL_masking', 'brute_force_mask'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -390,7 +392,7 @@ def get_args_evaluate():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ', 'audio_RNN'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 
@@ -400,19 +402,32 @@ def get_args_evaluate():
     parser.set_defaults(feature=False)
     
     # Preprocessing parsing
-    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = [None], 
+    """
+    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = ['None'], 
         help = 'sequence of preprocessing steps')
-    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = [None], 
+    parser.add_argument('--preprocessing_adversary_model_sequence', nargs='+', type = str, default = ['None'], 
         help = 'sequence of preprocessing steps')
+    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = ['None'], 
+        help = 'sequence of preprocessing steps')
+    
+    """
+    
+
+    # Transferability parsing
+    parser.add_argument('--adversary_model_name', choices = [
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
+        ], default = 'none',
+        help = 'model used for generating adversarial examples when testing transferability')
+
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     # Adversarial attack parsing 
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask'
         ], default = 'FGSM_vanilla',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 

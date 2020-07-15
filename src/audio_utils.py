@@ -3,6 +3,12 @@ import librosa as lr
 from scipy import signal
 from matplotlib import pyplot as plt
 
+
+def resample_to_44100(x, Fs):
+    nr_of_samples = int(x.shape[0] * (44100/Fs))
+    x = signal.resample(x, nr_of_samples)
+    return x
+
 def zeropad(x, target_len):
     """ if len(x)<length: Zeropads last dimension to have size = length
         else: return x[0:length]

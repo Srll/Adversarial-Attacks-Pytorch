@@ -17,24 +17,27 @@ class PreProcess():
                             'spectrogram':(self.spectrogram, self.ispectrogram),
                             'MFCC':(self.MFCC, self.iMFCC),
                             'mag2db':(self.mag2db, self.db2mag),
-                            'mag2db2':(self.mag2db2, self.db2mag2),
+                            'mag2db96':(self.mag2db96, self.db2mag96),
                             'insert_rgb_dim': (self.push_rgb_dim, self.pop_rgb_dim),
                             'insert_data_dim': (self.push_data_dim, self.pop_data_dim),
                             'visualize': (self.plot,self.plot),
                             'dbg': (self.dbg, self.dbg),
                             'normalize': (self.normalize, self.inormalize),
-                            'normalize_batch': (self.normalize_batch, self.inormalize_batch),}
+                            'normalize_batch': (self.normalize_batch, self.inormalize_batch),
+                            'resample_to_44100': (self.resample_to_44100, self.iresample_to_44100)}
 
 
         self.flag_direction = None # used for torubleshooting
         #self.kwargs = kwargs
 
-        self.temp = 1
+        self.fs = 16000
+        
         # TODO make it possible to specify these through CLI
         self.kwargs =  {'coeffs_denominator' : signal.butter(6,5000,btype='low',fs=16000)[1],
                         'coeffs_numerator' : signal.butter(6,5000,btype='low',fs=16000)[0], 
-                        'stft_n_fft':512,
                         'max_value':100000}
+        self.stft_n_fft = 512
+                        
 
 
         # stores values from forward pass that are needed during the inverse pass
@@ -65,7 +68,8 @@ class PreProcess():
         
         for t in self.transforms_inverse:
             x = t(x)
-        x = int(x*2^16)/(2^16) # quantize to 16 bit
+        x = (x*np.power(2,16)).astype(int)/np.power(2,16) # quantize to 16 bit
+        
         return torch.from_numpy(x).to(torch.float32)
 
     
@@ -100,23 +104,29 @@ class PreProcess():
     def dummy(self, x):
         return x
 
-    def mag2db2(self,x):
+    def mag2db96(self,x):
         x[x == 0] = np.finfo(float).eps
         PSD = 10 * np.log10(np.square(np.abs(x)))
-        P = 96 - np.max(PSD) + PSD # should this be over one FFT or over STFT?
-        #self.max = np.max(PSD, axis=1)
-        self.max = np.max(PSD)
+        self.max = np.max(PSD,axis=(1,3)).T
+        P = np.swapaxes(96 + np.swapaxes(PSD, 0, -1) - self.max, 0, -1)
         return P
 
-    def db2mag2(self,P):
-        PSD = np.zeros_like(P)
-        #for b in range(P.shape[0]):
-        #    PSD[b] = P[b] - 96 + self.max[b]
-        PSD = P - 96 + self.max
+    def db2mag96(self,P):
+        PSD = np.swapaxes(np.swapaxes(P,0,-1) - 96 + self.max,0,-1)
         x = np.sqrt(np.power(10, PSD/10))
         return x
 
+    def resample_to_44100(self, x):
+        self.original_size = x.shape[1]
+        nr_of_samples = int(x.shape[1] * (44100/self.fs))
+        x = signal.resample(x, nr_of_samples, axis=1)
+        return x
 
+    def iresample_to_44100(self, x):
+        x = signal.resample(x,self.original_size, axis=1)
+        return x
+
+    
     def mag2db(self, x):
         
         x[x == 0] = np.finfo(float).eps
@@ -140,11 +150,11 @@ class PreProcess():
         return y
 
     def stft(self, x):
-        f, t, s = signal.stft(x, nperseg=512, noverlap=256,nfft=self.kwargs.get('stft_n_fft'))
+        f, t, s = signal.stft(x, nperseg=self.stft_n_fft, noverlap=self.stft_n_fft/2,nfft=self.stft_n_fft)
         return f,t,s
 
     def istft(self, s):
-        _, x = signal.istft(s,nperseg=512, noverlap=256,nfft=self.kwargs.get('stft_n_fft'))
+        _, x = signal.istft(s,nperseg=self.stft_n_fft, noverlap=self.stft_n_fft/2,nfft=self.stft_n_fft)
         return x
     
     def push_rgb_dim(self, x):
@@ -185,76 +195,93 @@ class PreProcess():
 
 
 
-    def spectrogram(self, x):
-        
+    def spectrogram_mel(self, x):
+        # FIX
         _,_,s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag)
         
-        s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
+        s_pow = np.power(s.real, 2) + np.power(s.imag, 2)
         return s_pow
 
-    def ispectrogram(self, s_pow):
-        s_real = s_pow * np.sin(self.phi)
-        s_imag = s_pow * np.cos(self.phi)
+    def spectrogram(self, x):
+        _,_,s = self.stft(x)
+        self.phi = np.arctan2(s.real, s.imag)
+        
+        s_abs = np.abs(s)
+        return s_abs
+
+    def ispectrogram(self, s_abs):
+        s_real = s_abs * np.sin(self.phi)
+        s_imag = s_abs * np.cos(self.phi)
         s = s_real + s_imag*1.0j
         x = self.istft(s)
         return x
     
+
+
     
     def MFCC(self, x): # TODO
         def f_to_m(f):
             return 2595 * np.log10(1 + f/700)
         def m_to_f(m):
-            return 700*(np.pow(10,m/2595) - 1)
+            return 700*(np.power(10,m/2595) - 1)
         
         fs = 16000
-        NR_BINS = 20 # 26 is a usual amount of MEL bins
-
-        _,_,s = self.stft(x)
-        self.phi = np.arctan2(s.real, s.imag) # save for reconstruction
-        s_pow = np.sqrt(np.power(s.real, 2) + np.power(s.imag, 2 ))
         
-        s_pow = np.swapaxes(s_pow, 1, 2)
-        
-        f = fs/2 * np.arange(0,s_pow.shape[2]) / s_pow.shape[2] 
-        m = f_to_m(f)
-        
-        m_bins = NR_BINS * m / np.max(m)
-        # assign to bins TODO add triangle window
-        m_bins = np.floor(m_bins)
-        # find all tranistions between values
-        idx = np.where(m_bins[:-1] != m_bins[1:])[0]
+        NR_BINS = 26
 
-        banks = np.zeros((s_pow.shape[:-1] + (NR_BINS,)))
+        x_pre_emphasis = x[:,1:] - 0.9*x[:,:-1]
 
-        self.bins_distribution = []
-        for k in range(1, idx.shape[0]-1):
-            s_pow_bin_left = s_pow[..., idx[k-1]:idx[k]]
-            s_pow_bin_right = s_pow[..., idx[k]:idx[k+1]]
-           
-            left_triangle = np.arange(1,1+idx[k]-idx[k-1]) / (idx[k]-idx[k-1])
-            right_triangle = np.arange(1,1+idx[k+1]-idx[k]) / (idx[k+1]-idx[k])
-            
-            
-            
-
-            banks[..., k] = np.sum(s_pow_bin_left * left_triangle, axis=2) + np.sum(s_pow_bin_right * right_triangle, axis=2)
-
-            left = s_pow_bin_left * left_triangle / np.expand_dims(banks[..., k], axis=-1)
-            right = s_pow_bin_right * right_triangle / np.expand_dims(banks[..., k], axis=-1)
-
-
-            self.bins_distribution.append((left, right)) # save for reconstruction
-
+        #_,_,s = self.stft(x)
+        s = (self.spectrogram(x_pre_emphasis))**2
+        #s = self.spectrogram(x_pre_emphasis)
+        s = np.swapaxes(s, 1, 2)
+        f_res = s.shape[2]
         
 
-        banks_db = self.mag2db(banks)
-        
-        melFCC = fftpack.dct(banks_db, axis=2)
-        melFCC = np.swapaxes(melFCC, 1, 2)
-        import pdb; pdb.set_trace()
+        mel_max = f_to_m(fs/2)
+        mel_min = 0
+        mel_points = np.linspace(mel_min, mel_max, NR_BINS + 2)
+        hz_points = m_to_f(mel_points) # center point of each filter defined in Hz
 
-        return 
+
+        bins = np.floor((f_res + 1) * hz_points / fs)
+
+        fbank = np.zeros((NR_BINS, f_res))
+        for m in range(1, NR_BINS + 1):
+            f_m_minus = int(bins[m - 1])   # left
+            f_m = int(bins[m])             # center
+            f_m_plus = int(bins[m + 1])    # right
+
+            for k in range(f_m_minus, f_m):
+                fbank[m - 1, k] = (k - bins[m - 1]) / (bins[m] - bins[m - 1])
+            for k in range(f_m, f_m_plus):
+                fbank[m - 1, k] = (bins[m + 1] - k) / (bins[m + 1] - bins[m])
+        
+        
+        s_mel = np.dot(s, fbank.T)
+        
+        s_mel_log = self.mag2db2(s_mel)
+        mfcc = fftpack.dct(s_mel_log, axis=2, norm='ortho')
+        mfcc = np.swapaxes(mfcc,1,2)
+        
+        #temp = np.swapaxes(temp,0,2)
+
+        imx = librosa.feature.mfcc(y=x_pre_emphasis[0], sr=fs, hop_length=256, norm='ortho', n_mfcc=26)
+        #plt.imshow(imx)
+        #plt.show()
+
+        #plt.imshow(mfcc[0])
+        #plt.show()
+        
+        
+        mfcc_1 = np.zeros(mfcc.shape)
+        mfcc_2 = np.zeros(mfcc.shape)
+        mfcc_1[:,:,1:] = mfcc[... ,0:-1] - mfcc[... ,1:]
+        mfcc_2[:,:,1:] = mfcc_1[... ,0:-1] - mfcc_1[... ,1:]
+        mfcc = np.concatenate((mfcc, mfcc_1,mfcc_2), axis=1)
+
+        return mfcc
     
 
     def iMFCC(self, x):
@@ -299,7 +326,7 @@ class PreProcess():
 
     def plot(self, x):
         if len(x.shape) == 3:
-            x_p = x[0]
+            x_p = x[-1]
         elif len(x.shape) == 4:
             x_p = np.moveaxis(x[0], 0, -1)
             x_p = x_p / np.max(x_p)
@@ -310,7 +337,8 @@ class PreProcess():
         
         plt.ion()
         plt.draw()
-        plt.show(block=False)
+        #plt.show(block=False)
+        plt.show(block=True)
         plt.pause(0.001)
         return x
 
