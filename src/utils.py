@@ -25,7 +25,7 @@ def create_speech_commands_dataset_atlas(directory, force=False):
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
 
             paths['train'] += path_names[:int(len(path_names)*0.85)]
-            paths['validation'] += path_names[int(len(path_names)*0.995):]
+            paths['validation'] += path_names[int(len(path_names)*0.9992):]
         
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -188,10 +188,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         return audio, label
 
 class MnistDataset(torch.utils.data.Dataset):
-
     def __init__(self, image_directory, input_size, train=True, transform=None, force=False):
-        
-
         create_mnist_dataset_atlas(image_directory)
         with open(os.path.join(image_directory,'mnist_atlas.pkl'), 'rb') as file:
             self.image_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
@@ -356,7 +353,7 @@ def get_args_train():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'GL', 'GL_masking', 'brute_force_mask'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'GL', 'GL_masking','brute_force_mask', 'brute_force_mask_reduce'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -422,12 +419,12 @@ def get_args_evaluate():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask','brute_force_mask_reduce'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     # Adversarial attack parsing 
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask','brute_force_mask_reduce'
         ], default = 'FGSM_vanilla',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 

@@ -15,6 +15,7 @@ class PreProcess():
                             'stft': (self.stft, self.istft),
                             'filter': (self.filt, self.ifilt), 
                             'spectrogram':(self.spectrogram, self.ispectrogram),
+                            'spectrogram32':(self.spectrogram32, self.ispectrogram32),
                             'MFCC':(self.MFCC, self.iMFCC),
                             'mag2db':(self.mag2db, self.db2mag),
                             'mag2db96':(self.mag2db96, self.db2mag96),
@@ -36,7 +37,7 @@ class PreProcess():
         self.kwargs =  {'coeffs_denominator' : signal.butter(6,5000,btype='low',fs=16000)[1],
                         'coeffs_numerator' : signal.butter(6,5000,btype='low',fs=16000)[0], 
                         'max_value':100000}
-        self.stft_n_fft = 512
+        self.stft_n_fft = 32
                         
 
 
@@ -68,12 +69,9 @@ class PreProcess():
         
         for t in self.transforms_inverse:
             x = t(x)
-        x = (x*np.power(2,16)).astype(int)/np.power(2,16) # quantize to 16 bit
+        #x = (x*np.power(2,16)).astype(int)/np.power(2,16) # quantize to 16 bit
         
         return torch.from_numpy(x).to(torch.float32)
-
-    
-
 
 
     def normalize_batch(self, x):
@@ -107,6 +105,7 @@ class PreProcess():
     def mag2db96(self,x):
         x[x == 0] = np.finfo(float).eps
         PSD = 10 * np.log10(np.square(np.abs(x)))
+        
         self.max = np.max(PSD,axis=(1,3)).T
         P = np.swapaxes(96 + np.swapaxes(PSD, 0, -1) - self.max, 0, -1)
         return P
@@ -117,13 +116,17 @@ class PreProcess():
         return x
 
     def resample_to_44100(self, x):
-        self.original_size = x.shape[1]
-        nr_of_samples = int(x.shape[1] * (44100/self.fs))
-        x = signal.resample(x, nr_of_samples, axis=1)
-        return x
+        self.original_size_44100 = x.shape[1]
+        self.nr_of_samples = int(x.shape[1] * (44100/self.fs))
+        zero_pad_length = int((self.stft_n_fft/2)*np.ceil(self.nr_of_samples / (self.stft_n_fft/2)))
+        
+        x_44100 = np.zeros((x.shape[0],) + (zero_pad_length,))
+        x_44100[:,:self.nr_of_samples] = signal.resample(x,self.nr_of_samples, axis=1)
+        
+        return x_44100
 
-    def iresample_to_44100(self, x):
-        x = signal.resample(x,self.original_size, axis=1)
+    def iresample_to_44100(self, x_44100):
+        x = signal.resample(x_44100[:,:self.nr_of_samples], self.original_size_44100, axis=1)
         return x
 
     
@@ -150,7 +153,7 @@ class PreProcess():
         return y
 
     def stft(self, x):
-        f, t, s = signal.stft(x, nperseg=self.stft_n_fft, noverlap=self.stft_n_fft/2,nfft=self.stft_n_fft)
+        f, t, s = signal.stft(x, nperseg=self.stft_n_fft, noverlap=self.stft_n_fft/2, nfft=self.stft_n_fft)
         return f,t,s
 
     def istft(self, s):
@@ -171,14 +174,17 @@ class PreProcess():
     
     def push_data_dim(self, x):
         dims = len(x.shape)
-        x = np.squeeze(x)
-        if dims == 3:
-            x_new = np.zeros((x.shape[0],) + (1,) + (x.shape[1:]))
-            x_new[:,0] = x
-        else:
-            print("Not supported size for RGB conversion")
-        return x_new
+        if x.shape[0] == 1:
+            return np.reshape(x, ((1,) + (1,) + (x.shape[1:])))
 
+        else:
+            x = np.squeeze(x)
+            if dims == 3:
+                x_new = np.zeros((x.shape[0],) + (1,) + (x.shape[1:]))
+                x_new[:,0] = x
+            else:
+                print("Not supported size for RGB conversion")
+            return x_new
 
     def pop_rgb_dim(self, x):
         x_new = np.zeros((x.shape[0],) + x.shape[2:])
@@ -206,7 +212,6 @@ class PreProcess():
     def spectrogram(self, x):
         _,_,s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag)
-        
         s_abs = np.abs(s)
         return s_abs
 
@@ -217,7 +222,20 @@ class PreProcess():
         x = self.istft(s)
         return x
     
+    def spectrogram32(self, x):
+        f, t, s = signal.stft(x, nperseg=64, noverlap=48, padded=False)
+        self.phi = np.arctan2(s.real, s.imag)
+        s_abs = np.abs(s)
+        return s_abs
 
+    def ispectrogram32(self, s_abs):
+        s_real = s_abs * np.sin(self.phi)
+        s_imag = s_abs * np.cos(self.phi)
+        s = s_real + s_imag*1.0j
+        _, x = signal.istft(s, nperseg=64, noverlap=48)
+        return x
+
+        
 
     
     def MFCC(self, x): # TODO
@@ -286,39 +304,7 @@ class PreProcess():
 
     def iMFCC(self, x):
 
-        fs = 16000 # TODO 
-        # 26 is a usual amount of MEL bins
-        NR_BINS = 4
-
-        
-
-        melFCC = np.swapaxes(x, 1, 2)
-        banks_db = fftpack.idct(melFCC, axis=2)
-
-        banks = self.db2mag(banks_db)
-
-
-        s_pow = np.zeros(banks.shape[:-1] + (129,)) # TODO not hardcode
-        
-        idx_low = 0
-        idx_high = self.bins_distribution[0][0].shape[-1]
-        
-        
-        for k in range(NR_BINS-2):
-            print(k)
-            s_pow[..., idx_low:idx_high] = self.bins_distribution[k][0] * np.expand_dims(banks[..., k], axis=-1)
-            idx_low = idx_high
-            idx_high += self.bins_distribution[k][1].shape[-1]
-            s_pow[..., idx_low:idx_high] = self.bins_distribution[k][1] * np.expand_dims(banks[..., k], axis=-1)
-            
-        s_pow = np.swapaxes(s_pow, 1, 2)
-        
-        s_real = s_pow * np.sin(self.phi)
-        s_imag = s_pow * np.cos(self.phi)
-        s = s_real + s_imag*1.0j
-        x = self.istft(s)
-        return x
-        
+        None
 
         
         
@@ -349,75 +335,4 @@ class PreProcess():
         return x
 
 
-    """
-    def get_masking_threshold(self, x):
-        # algorithm based on values from "Audio Watermark, A Comprehensive Foundation Using MATLAB" from 2015
-        
-        def quite_threshold(f):
-            # output is in dB
-            threshold = 3.64*np.power(f/1000, -0.8) \
-                - 6.5 * np.exp(-0.6*(np.square((f/1000) - 3.3))) \
-                + 1e-3 * np.power(f/1000, 4)
-            return threshold
-        
-        def local_maximas(p):
-            # returns index of all local extrema over frequency axis
-            return np.stack(signal.argrelextrema(p, np.less, axis=1), axis=-1) 
-            
-
-        def hz_to_bark(f):
-            b = 13 * np.arctan(0.76*f / 1000) + 3.5 * np.square(np.arctan(f/7500))
-            return b
-        quite_threshold
-        hz_to_bark
-
-
-
-        nfft = 512
-        n = np.arange(0, nfft)
-        w = np.sqrt(8/3) * 1/2 * (1 - np.cos(2*np.pi*n/nfft)) # modified hanning window (sum = 1 in power spectral domain)
-        f,_,s = signal.stft(x, window=w, nperseg=nfft, fs=16000) # TODO fix correct fs
-        psd = 1/2*self.mag2db(np.square(np.abs(s)))
-        
-        
-        p = np.swapaxes(96 - np.max(psd, axis=1) + np.swapaxes(psd,0,1),0,1) # max over frequency axis
-        
-        p_m_idxs = local_maximas(p)
-
-        STM = []
-        for i in range(p_m_idxs.shape[0]):
-            masker = True
-            if 1 < p_m_idxs[i][1] < 62: # check what bark range to use
-                dk_l = [-2, 2]
-            elif 61 < p_m_idxs[i][1] < 127:
-                dk_l = [-3,-2,2, 3]
-            elif 126 < p_m_idxs[i][1] < 249:
-                dk_l = [-6,-5,-4,-3,-2, 2,3,4,5,6]
-            else:
-                masker = False
-                dk_l = []
-            
-            for dk in dk_l:
-        
-                if p[p_m_idxs[i][0],p_m_idxs[i][1],p_m_idxs[i][2]] - p[p_m_idxs[i][0],p_m_idxs[i][1]+dk,p_m_idxs[i][2]] <= 7:
-                    masker = False
-                    break
-
-            if masker == True:
-                STM.append(i)
-
-
-            
-
-        #for i in range(p_)
-        #p_TM = 
-    """
-
-
-
-
-
-
-
-
-
+    

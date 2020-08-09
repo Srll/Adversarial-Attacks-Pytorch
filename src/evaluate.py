@@ -50,12 +50,6 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     # TODO fix
     input_type = 'audio'
     
-    if input_type == 'images':
-        save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
-            path=figures_path, target_name=target_name)
-    elif input_type == 'audio':
-        save_audio(inputs.detach(), adversarial_noise.detach(), inputs_adversarial.detach(), labels.detach(), labels_estimations.detach(), labels_estimations_adversarial.detach(), 
-            path=figures_path, target_name=target_name)
         
         #inputs
         #save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
@@ -67,6 +61,9 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     accuracy /= len(dataloader)
     accuracy_adversarial /= len(dataloader)
 
+    
+    
+    
     if targeted:
         print('Targeted attack: {target_name}')
     else: 
@@ -76,7 +73,39 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     print(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.2f}')
     print(f'Accuracy: {accuracy:.2f}')
     print(f'Accuracy (adversarial): {accuracy_adversarial:.2f}')
+    
+    try:
+        os.mkdir(figures_path + '\\' +model.model.__str__().split('(\n')[0])
+    except:
+        None
 
+    if targeted:
+        figures_path_extended = figures_path + '\\' +model.model.__str__().split('(\n')[0] + '\\targeted'
+    else:
+        figures_path_extended  = figures_path + '\\' +model.model.__str__().split('(\n')[0] + '\\untargeted'
+
+    while os.path.isdir(figures_path_extended):
+        figures_path_extended += 'I'
+
+    os.mkdir(figures_path_extended)
+    
+    f = open(figures_path_extended + '\\' + "results.txt", "a")
+    if targeted:
+        f.write('Targeted attack: {target_name}')
+    else:
+        f.write('Untargeted attack:')
+    f.write(f'Cross-Entropy Loss: {loss:.2f} \n')
+    f.write(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.2f} \n')
+    f.write(f'Accuracy: {accuracy:.2f}\n')
+    f.write(f'Accuracy (adversarial): {accuracy_adversarial:.2f} \n')
+    f.close()
+
+    if input_type == 'images':
+        save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
+            path=figures_path, target_name=target_name)
+    elif input_type == 'audio':
+        save_audio(inputs.detach(), adversarial_noise.detach(), inputs_adversarial.detach(), labels.detach(), labels_estimations.detach(), labels_estimations_adversarial.detach(), path=figures_path_extended, target_name=target_name)
+    
     
 def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
     def paint_images(im, correct):
@@ -132,7 +161,7 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
 
 def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
     for i in range (x.shape[0]):
-        divider = torch.max(x[i] + adv_noise[i] + x_adv[i]) # TODO fix this    
+        divider = torch.max(x[i] + adv_noise[i] + x_adv[i]) 
         scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'.wav'), 16000, (x[i]/divider).numpy())
         scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'_adv.wav'), 16000, (x_adv[i]/divider).numpy())
         scipy.io.wavfile.write(os.path.join(path, 'adv_noise'+str(i)+'.wav'), 16000, (adv_noise[i]/divider).numpy())
@@ -218,7 +247,7 @@ def evaluate():
     input_type = args.model_name.split('_')[0]
     
     evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
-    evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
+    #evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
 
 if __name__ == "__main__":
     evaluate()

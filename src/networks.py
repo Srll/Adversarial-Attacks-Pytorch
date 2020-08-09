@@ -11,6 +11,9 @@ import preprocess
 # use http instead of https
 from torchvision.models.shufflenetv2 import model_urls
 
+#torch.set_default_tensor_type(torch.DoubleTensor)
+#torch.set_default_dtype(torch.float64)
+
 model_urls['shufflenetv2_x0.5'] = model_urls['shufflenetv2_x0.5'].replace('https://', 'http://')
 
 
@@ -325,16 +328,16 @@ class audio_MJ(nn.Module):
     # raw audio 11 conv layer deep classifier 
     def __init__(self, classes, input_length):
         super(audio_MJ, self).__init__()
-        self.conv = nn.Conv1d(1, 64, 10, 1)
-        self.bn = nn.BatchNorm1d(64)
+        self.conv = nn.Conv1d(1, 128, 10, 1)
+        self.bn = nn.BatchNorm1d(128)
         self.pool = nn.MaxPool1d(2)
         
         size = int(((input_length - 10) / 2) + 1)
 
         temp = []
-        for i in range(3):
-            temp.append(nn.Conv1d(64, 64, 6))
-            temp.append(nn.BatchNorm1d(64))
+        for i in range(6):
+            temp.append(nn.Conv1d(128, 128, 6))
+            temp.append(nn.BatchNorm1d(128))
             temp.append(torch.nn.ReLU())
             temp.append(nn.MaxPool1d(3))
             size = int(((size - 6) / 3) + 1)
@@ -342,7 +345,7 @@ class audio_MJ(nn.Module):
         self.stack = nn.Sequential(*temp)
         
         self.avg_pool = nn.AvgPool1d(size-1)
-        self.fc = nn.Linear(64, classes)
+        self.fc = nn.Linear(128, classes)
         
     def forward(self, x):
         x = torch.unsqueeze(x,1)
@@ -354,7 +357,7 @@ class audio_MJ(nn.Module):
         x = self.avg_pool(x)
         x = x.permute(0, 2, 1) 
         x = self.fc(x)
-        x = torch.squeeze(x)
+        x = torch.squeeze(x,1)
         
         return x
 
@@ -396,11 +399,11 @@ class CNN(torch.nn.Module):
         elif self.network_type == 'audio_MJ':
             self.model = audio_MJ(classes, input_length)
         elif self.network_type == 'audio_conv2d_spectrogram':
-            self.preprocess = preprocess.PreProcess("spectrogram")
+            self.preprocess = preprocess.PreProcess(['spectrogram', 'insert_data_dim'])
             self.preprocess_bool = True
             self.model = audio_conv2d_spectrogram(classes, input_length)
         elif self.network_type == 'audio_conv2d_mfcc':
-            self.preprocess = preprocess.PreProcess("mfcc")
+            self.preprocess = preprocess.PreProcess(['mfcc', 'insert_data_dim'])
             self.preprocess_bool = True
             self.model = audio_conv2d_mfcc(classes, input_length)
         #elif self.network_type == 'audio_RNN':
@@ -416,7 +419,7 @@ class CNN(torch.nn.Module):
                 self.model.cuda()
                 return
             else:
-                print("No available CUDA device, running on CPU")
+                print("No available CUDA device found, running on CPU instead")
         else:
             self.GPU_enabled = False
             self.model.cpu()

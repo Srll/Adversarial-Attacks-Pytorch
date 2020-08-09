@@ -73,6 +73,7 @@ def quiet_threshold(f):
     threshold = 3.64*np.power(f/1000, -0.8) \
         - 6.5 * np.exp(-0.6*(np.square((f/1000) - 3.3))) \
         + 1e-3 * np.power(f/1000, 4)
+    threshold[threshold>96] = 96
     return threshold
 
 def TM_offset_db(masker):
@@ -129,7 +130,7 @@ def get_masking_threshold(x):
 
     
 
-    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=Fs, noverlap=N/2)
+    f_steps, t_steps, S = signal.stft(x, nperseg=N, fs=Fs, noverlap=384)
     bark_steps = f_to_bark(f_steps)
     max_bark = min(np.max(bark_steps), 25)
 
@@ -165,15 +166,19 @@ def get_masking_threshold(x):
 
 
         # remove weak maskers within 0.5 bark
-        TM = [P_TM>NEGATIVE_INF]
+        
+        TM = P_TM>NEGATIVE_INF
         bark_of_max_TM = f_to_bark(f_steps[TM])
         bark_of_NM = f_to_bark(CB_f_mean)  
         for k, bark in enumerate(bark_of_max_TM):
             # check closest TM
+            
             TM_val = P_TM[TM][k]
             TM_val_within_range = np.where(np.abs(bark - bark_of_max_TM) < 0.5)[0] # all of these lay within 0.5 bark
             
             # TODO start with strongest
+            # np.sort(TM_val[TM_val_within_range]) # sort so we check strongest value first
+            
             
             # compare TM_val to all within 0.5 bark range
             for idx in TM_val_within_range:
@@ -205,7 +210,7 @@ def get_masking_threshold(x):
 
         maskees_bark = f_to_bark(maskees_hz)
 
-        #import pdb; pdb.set_trace()
+
         for k, maskee_bark in enumerate(maskees_bark):
             # get TM for k
             for idx in np.where(P_TM>NEGATIVE_INF)[0]:
