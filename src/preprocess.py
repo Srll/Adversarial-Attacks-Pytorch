@@ -25,7 +25,11 @@ class PreProcess():
                             'dbg': (self.dbg, self.dbg),
                             'normalize': (self.normalize, self.inormalize),
                             'normalize_batch': (self.normalize_batch, self.inormalize_batch),
-                            'resample_to_44100': (self.resample_to_44100, self.iresample_to_44100)}
+                            'resample_to_44100': (self.resample_to_44100, self.iresample_to_44100),
+                            'spectrogram_phase': (self.spectrogram_96_phase, self.ispectrogram_96_phase),
+                            'cast_int16': (self.cast_int16, self.dummy),
+                            'sqrt(8/3)':(self.sqrt_8_3,self.isqrt_8_3)
+                            }
 
 
         self.flag_direction = None # used for torubleshooting
@@ -60,8 +64,10 @@ class PreProcess():
         
         for t in self.transforms_forward:
             x = t(x)
-        
-        return torch.from_numpy(x).to(torch.float32)
+        try:
+            return torch.from_numpy(x).to(torch.float32)
+        except:
+            return x
 
     def inverse(self, x):
         if torch.is_tensor(x):
@@ -73,6 +79,11 @@ class PreProcess():
         
         return torch.from_numpy(x).to(torch.float32)
 
+    def sqrt_8_3(self,x):
+        return x * np.sqrt(8/3)
+
+    def isqrt_8_3(self,x):
+        return x / np.sqrt(8/3)
 
     def normalize_batch(self, x):
         if (len(x.shape) == 4):
@@ -102,6 +113,10 @@ class PreProcess():
     def dummy(self, x):
         return x
 
+    def cast_int16(self, x):
+        return x.astype(np.int16)
+
+            
     def mag2db96(self,x):
         x[x == 0] = np.finfo(float).eps
         PSD = 10 * np.log10(np.square(np.abs(x)))
@@ -129,14 +144,12 @@ class PreProcess():
         x = signal.resample(x_44100[:,:self.nr_of_samples], self.original_size_44100, axis=1)
         return x
 
-    
     def mag2db(self, x):
-        
         x[x == 0] = np.finfo(float).eps
-        return 20 * np.log10(x)
+        return 10 * np.log10(x)
     
     def db2mag(self, x):
-        return np.power(10, x/20)
+        return np.power(10, x/10)
 
     def filt(self, x):
         #TODO change lfilter method to scipy recomended method (faster)
@@ -179,11 +192,8 @@ class PreProcess():
 
         else:
             x = np.squeeze(x)
-            if dims == 3:
-                x_new = np.zeros((x.shape[0],) + (1,) + (x.shape[1:]))
-                x_new[:,0] = x
-            else:
-                print("Not supported size for RGB conversion")
+            x_new = np.zeros((x.shape[0],) + (1,) + (x.shape[1:]),dtype=x.dtype)
+            x_new[:,0] = x
             return x_new
 
     def pop_rgb_dim(self, x):
@@ -200,9 +210,43 @@ class PreProcess():
         return x_new
 
 
+    def spectrogram_96_phase(self,x):
+        _,_,s = self.stft(x)
+        self.phi = np.arctan2(s.real, s.imag)
+        s_abs = np.abs(s)
+        
+        P = self.mag2db96(self.push_data_dim(s_abs))
+        mag = self.db2mag(P)
+        
+        mag = self.pop_data_dim(mag)
+        s_real = mag * np.sin(self.phi)
+        s_imag = mag * np.cos(self.phi)
+        s = s_real + s_imag*1.0j
+        s = self.push_data_dim(s)
+        
+    
+        return s
+
+    def ispectrogram_96_phase(self, s):
+        
+        self.phi = np.arctan2(s.real, s.imag)
+        mag = np.abs(s)
+
+        P = self.mag2db(mag)
+        s_abs = self.db2mag96(P)
+        
+
+        s_real = s_abs * np.sin(self.phi)
+        s_imag = s_abs * np.cos(self.phi)        
+        s = s_real + s_imag*1.0j
+        
+        s = self.pop_data_dim(s)
+        x = self.istft(s) 
+        return x
+
+        
 
     def spectrogram_mel(self, x):
-        # FIX
         _,_,s = self.stft(x)
         self.phi = np.arctan2(s.real, s.imag)
         

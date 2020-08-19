@@ -168,8 +168,9 @@ def get_masking_threshold(x):
         # remove weak maskers within 0.5 bark
         
         TM = P_TM>NEGATIVE_INF
-        bark_of_max_TM = f_to_bark(f_steps[TM])
-        bark_of_NM = f_to_bark(CB_f_mean)  
+        order = np.argsort(P_TM)[::-1]
+        bark_of_max_TM = f_to_bark(f_steps[order][TM])
+        bark_of_NM = f_to_bark(CB_f_mean)
         for k, bark in enumerate(bark_of_max_TM):
             # check closest TM
             
@@ -182,21 +183,19 @@ def get_masking_threshold(x):
             
             # compare TM_val to all within 0.5 bark range
             for idx in TM_val_within_range:
-                if TM_val < P_TM[TM][idx]:
-                    P_TM[TM][k] = NEGATIVE_INF
+                if TM_val < P_TM[order][idx]:
+                    P_TM[order][k] = NEGATIVE_INF
             
 
 
             # also check closest NM (we only look at closest since we know these are spread ~1 bark apart)
-            # TODO make sure within 0.5 bark
             NM_idx = np.argmin(np.abs(bark_of_NM - bark))
             NM_val = P_NM[NM_idx]
             if TM_val < NM_val:
                 P_TM[TM][idx] = NEGATIVE_INF
             else:
                 P_NM[NM_idx] = NEGATIVE_INF
-
-            # TODO check that masker is stronger then quiet
+            
         
         # ========================= STEP 4 ===============================
         

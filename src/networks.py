@@ -270,28 +270,20 @@ class audio_M5(nn.Module):
         self.conv_1 = nn.Conv1d(1, 128, 80, 4) # original paper uses 1, 128, 80, 4
         self.bn_1 = nn.BatchNorm1d(128)
         self.pool_1 = nn.MaxPool1d(4) # original paper uses 4
-        
-        size = int(((input_length - 80) / 4) / 4 + 1)
 
         self.conv_2 = nn.Conv1d(128, 128, 3) # original paper uses 128, 128, 3
         self.bn_2 = nn.BatchNorm1d(128)
         self.pool_2 = nn.MaxPool1d(4) # original paper uses 4
-        
-        size = int(((size - 3) / 4) + 1)
 
         self.conv_3 = nn.Conv1d(128, 256, 3)
         self.bn_3 = nn.BatchNorm1d(256)
         self.pool_3 = nn.MaxPool1d(4) # original paper uses 4
-        
-        size = int(((size - 3) / 4) + 1)
 
         self.conv_4 = nn.Conv1d(256, 512, 3)
         self.bn_4 = nn.BatchNorm1d(512)
         self.pool_4 = nn.MaxPool1d(4) # original paper uses 4
         
-        size = int(((size - 3) / 4))
-        
-        self.avg_pool = nn.AvgPool1d(size) # TODO fix better way of setting size in network
+        self.avg_pool = nn.AvgPool1d(15) 
         
         self.fc = nn.Linear(512, nr_classes)
         
@@ -304,7 +296,6 @@ class audio_M5(nn.Module):
         x = self.conv_2(x)
         x = F.relu(self.bn_2(x))
         x = self.pool_2(x)
-        
         
         x = self.conv_3(x)
         x = F.relu(self.bn_3(x))
@@ -324,27 +315,49 @@ class audio_M5(nn.Module):
         return x
 
 
-class audio_MJ(nn.Module):
+class audio_F7(nn.Module):
     # raw audio 11 conv layer deep classifier 
     def __init__(self, classes, input_length):
-        super(audio_MJ, self).__init__()
-        self.conv = nn.Conv1d(1, 128, 10, 1)
-        self.bn = nn.BatchNorm1d(128)
+        super(audio_F7, self).__init__()
+        self.conv = nn.Conv1d(1, 32, 10, 1)
+        self.bn = nn.BatchNorm1d(32)
         self.pool = nn.MaxPool1d(2)
         
-        size = int(((input_length - 10) / 2) + 1)
-
-        temp = []
-        for i in range(6):
-            temp.append(nn.Conv1d(128, 128, 6))
-            temp.append(nn.BatchNorm1d(128))
-            temp.append(torch.nn.ReLU())
-            temp.append(nn.MaxPool1d(3))
-            size = int(((size - 6) / 3) + 1)
-
-        self.stack = nn.Sequential(*temp)
         
-        self.avg_pool = nn.AvgPool1d(size-1)
+
+        network = []
+        network.append(nn.Conv1d(32, 32, 5))
+        network.append(nn.BatchNorm1d(32))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(3))
+
+        network.append(nn.Conv1d(32, 32, 5))
+        network.append(nn.BatchNorm1d(32))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(3))
+        
+        network.append(nn.Conv1d(32, 64, 5))
+        network.append(nn.BatchNorm1d(64))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(3))
+        
+        network.append(nn.Conv1d(64, 64, 5))
+        network.append(nn.BatchNorm1d(64))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(3))
+        
+        network.append(nn.Conv1d(64, 64, 5))
+        network.append(nn.BatchNorm1d(64))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(3))
+        
+        network.append(nn.Conv1d(64, 128, 5))
+        network.append(nn.BatchNorm1d(128))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(3))
+
+        self.stack = nn.Sequential(*network)
+        self.avg_pool = nn.AvgPool1d(9)
         self.fc = nn.Linear(128, classes)
         
     def forward(self, x):
@@ -352,7 +365,6 @@ class audio_MJ(nn.Module):
         x = self.conv(x)
         x = F.relu(self.bn(x))
         x = self.pool(x)        
-        
         x = self.stack(x)
         x = self.avg_pool(x)
         x = x.permute(0, 2, 1) 
@@ -360,6 +372,66 @@ class audio_MJ(nn.Module):
         x = torch.squeeze(x,1)
         
         return x
+
+class audio_F10(nn.Module):
+    # raw audio 10 conv layer deep classifier 
+    def __init__(self, classes, input_length):
+        super(audio_F10, self).__init__()
+        conv_channels_1 = 32
+        conv_channels_2 = 48
+        conv_channels_3 = 96
+        self.conv = nn.Conv1d(1, conv_channels_1, 10, 1)
+        self.bn = nn.BatchNorm1d(conv_channels_1)
+        self.pool = nn.MaxPool1d(3)
+        
+        size = int(((input_length - 10) / 3) + 1)
+
+        network = []
+        for i in range(3):
+            
+            network.append(nn.Conv1d(conv_channels_1, conv_channels_1, 3))
+            network.append(nn.BatchNorm1d(conv_channels_1))
+            network.append(torch.nn.ReLU())
+            network.append(nn.MaxPool1d(2))
+        
+        network.append(nn.Conv1d(conv_channels_1, conv_channels_2, 3))
+        network.append(nn.BatchNorm1d(conv_channels_2))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(2))
+        for i in range(2):
+            network.append(nn.Conv1d(conv_channels_2, conv_channels_2, 3))
+            network.append(nn.BatchNorm1d(conv_channels_2))
+            network.append(torch.nn.ReLU())
+            network.append(nn.MaxPool1d(2))
+
+        network.append(nn.Conv1d(conv_channels_2, conv_channels_3, 3))
+        network.append(nn.BatchNorm1d(conv_channels_3))
+        network.append(torch.nn.ReLU())
+        network.append(nn.MaxPool1d(2))
+        for i in range(2):
+            network.append(nn.Conv1d(conv_channels_3, conv_channels_3, 3))
+            network.append(nn.BatchNorm1d(conv_channels_3))
+            network.append(torch.nn.ReLU())
+            network.append(nn.MaxPool1d(2))
+        
+        self.stack = nn.Sequential(*network)
+        self.avg_pool = nn.AvgPool1d(8)
+        self.fc = nn.Linear(conv_channels_3, classes)
+        
+    def forward(self, x):
+        x = torch.unsqueeze(x,1)
+        x = self.conv(x)
+        x = F.relu(self.bn(x))
+        x = self.pool(x)        
+        x = self.stack(x)
+        
+        x = self.avg_pool(x)
+        x = x.permute(0, 2, 1) 
+        x = self.fc(x)
+        x = torch.squeeze(x,1)
+        
+        return x
+
 
 
 class CNN(torch.nn.Module):
@@ -393,11 +465,25 @@ class CNN(torch.nn.Module):
             self.model = torchvision.models.shufflenet_v2_x0_5(pretrained=True)
             self.model.fc = torch.nn.Linear(1024,classes)
         elif self.network_type == 'audio_M3':
+            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess_bool = True
             self.model = audio_M3(classes, input_length)
         elif self.network_type == 'audio_M5':
+            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess_bool = True
             self.model = audio_M5(classes, input_length)
         elif self.network_type == 'audio_MJ':
+            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess_bool = True
             self.model = audio_MJ(classes, input_length)
+        elif self.network_type == 'audio_F7':
+            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess_bool = True
+            self.model = audio_F7(classes, input_length)
+        elif self.network_type == 'audio_F10':
+            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess_bool = True
+            self.model = audio_F10(classes, input_length)
         elif self.network_type == 'audio_conv2d_spectrogram':
             self.preprocess = preprocess.PreProcess(['spectrogram', 'insert_data_dim'])
             self.preprocess_bool = True

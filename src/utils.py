@@ -25,7 +25,7 @@ def create_speech_commands_dataset_atlas(directory, force=False):
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
 
             paths['train'] += path_names[:int(len(path_names)*0.85)]
-            paths['validation'] += path_names[int(len(path_names)*0.9992):]
+            paths['validation'] += path_names[int(len(path_names)*0.995):]
         
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
@@ -175,7 +175,6 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         return len(self.labels)
     
     def __getitem__(self, idx):
-
         audio_path = self.audio_paths[idx]
         fs, audio = wavread(audio_path)
         audio = audio.astype(np.float32)
@@ -329,7 +328,7 @@ def get_args_train():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ', 'audio_conv2d_mfcc',  'audio_conv2d_spectrogram'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ','audio_F7','audio_F10', 'audio_conv2d_mfcc',  'audio_conv2d_spectrogram'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--n_iterations', type = int, default = 2000, 
@@ -342,14 +341,7 @@ def get_args_train():
         help = 'number of iterations to show preliminar results and store the model')
     parser.add_argument('--gpu', dest='gpu', action='store_true',
         help = 'If flag is present the program will use available CUDA device')
-    
-    # Preprocessing parsing
-    """
-    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = ['None'], 
-        help = 'sequence of preprocessing steps')
-    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = ['None'], 
-        help = 'sequence of preprocessing steps')
-    """
+
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
@@ -389,7 +381,7 @@ def get_args_evaluate():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 
@@ -398,21 +390,9 @@ def get_args_evaluate():
         help = 'If flag is present the program will use available CUDA device')
     parser.set_defaults(feature=False)
     
-    # Preprocessing parsing
-    """
-    parser.add_argument('--preprocessing_model_sequence', nargs='+', type = str, default = ['None'], 
-        help = 'sequence of preprocessing steps')
-    parser.add_argument('--preprocessing_adversary_model_sequence', nargs='+', type = str, default = ['None'], 
-        help = 'sequence of preprocessing steps')
-    parser.add_argument('--preprocessing_adversarial_sequence', nargs='+', type = str, default = ['None'], 
-        help = 'sequence of preprocessing steps')
-    
-    """
-    
-
     # Transferability parsing
     parser.add_argument('--adversary_model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
         ], default = 'none',
         help = 'model used for generating adversarial examples when testing transferability')
 

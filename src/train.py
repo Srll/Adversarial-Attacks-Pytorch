@@ -19,9 +19,6 @@ def train():
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name
     models_path = args.models_dir + args.dataset_name 
-    #if args.model_name == "simple_dense":
-    #    model = networks.Simple_dense(10)
-    #else:
     
     model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
     model.GPU(args.gpu)
@@ -41,7 +38,6 @@ def train():
     if args.adversarial_training_algorithm == 'FGSM_vanilla':
         optimizer = torch.optim.Adam(params_to_update, lr=learning_rate)
     else: 
-        #optimizer = torch.optim.SGD(params_to_update, lr=0.01,momentum=0.5)
         optimizer = torch.optim.Adam(params_to_update, lr=0.01)
 
     # prepare the losses and iterations
@@ -56,7 +52,6 @@ def train():
     checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path):  
         checkpoint = torch.load(checkpoint_path)
-        #model.preprocess = checkpoint['preprocessing_sequence']
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         iteration = checkpoint['iteration'] + 1
@@ -69,16 +64,18 @@ def train():
     # prepare adversary
     adversary = adversaries.AdversarialGenerator(model,criterion) 
     
+    # stopping criteria
+    N_TEST = 5
+    accuracy_history = [0] * N_TEST
+    
+
     bar = progressbar.ProgressBar(max_value=n_iterations_show)
     # train the model
     while iteration < n_iterations:
         for _, (inputs,labels) in enumerate(dataloader_train):
-            
             inputs = inputs.type(torch.FloatTensor)
             labels = labels.type(torch.LongTensor)
 
-            
-            
             optimizer.zero_grad()
             inputs_adv = adversary.generate_adversarial(args.adversarial_training_algorithm, inputs, labels, 
                     eps=args.epsilon, x_min=args.min_value_input, x_max=args.max_value_input, alpha=learning_rate, train=True)
@@ -102,8 +99,7 @@ def train():
                 running_accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
                 bar.update(iteration % n_iterations_show)
                 #bar.update(int(100 * i / n_iterations_show))
-                if iteration % n_iterations_show == n_iterations_show-1:
-                    
+                if iteration % n_iterations_show == n_iterations_show-1:        
                     loss_eval = 0.0
                     accuracy_eval = 0.0
                     print('\nEvaluating...')
@@ -130,9 +126,17 @@ def train():
                     
                     running_loss = 0.0
                     running_accuracy = 0.0
+                    if (accuracy_eval/len(dataloader_eval)).item() < min(accuracy_history):
+                        iteration = n_iterations
+                    accuracy_history.append((accuracy_eval/len(dataloader_eval)).item())
+                    accuracy_history.pop(0)
+                    
+                    print(accuracy_history)
+                    print(max(accuracy_history))
+            
             model.train()
             iteration += 1
-
+            
 
 # To make multiprocessing work on windows
 if __name__ == '__main__':

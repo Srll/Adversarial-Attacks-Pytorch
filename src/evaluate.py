@@ -22,7 +22,39 @@ figures_path = None
 args = utils.get_args_evaluate()
 
 def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, target_id=3, input_type = 'images'):
+    # create new folder to save results
     
+    figures_path_extended = os.path.join(figures_path, model.model.__str__().split('(\n')[0])
+    # creates subfolder for classifier i.e. figures\\speech\\CLASSIFIER_NAME
+    if not os.path.isdir(figures_path_extended):
+        os.mkdir(figures_path_extended)
+    
+    # creates subfolder for adversarial generator i.e. figures\\speech\\CLASSIFIER_NAME\\ADVERSARIAL
+    figures_path_extended = os.path.join(figures_path_extended, str(args.adversarial_attack_algorithm))
+    if not os.path.isdir(figures_path_extended):
+        os.mkdir(figures_path_extended)
+    
+    # creates subfolder for targeted or untargeted i.e. figures\\speech\\CLASSIFIER_NAME\\ADVERSARIAL\\targeted
+    if targeted:
+        figures_path_extended = os.path.join(figures_path_extended, 'targeted')
+        if not os.path.isdir(figures_path_extended):
+            os.mkdir(figures_path_extended)
+    else:
+        figures_path_extended = os.path.join(figures_path_extended, 'untargeted')
+        if not os.path.isdir(figures_path_extended):
+            os.mkdir(figures_path_extended)
+    # creates subfolder for attack strength (epsilon) i.e. figures\\speech\\CLASSIFIER_NAME\\targeted\\0.50
+    figures_path_extended = os.path.join(figures_path_extended, str(args.epsilon))
+    if not os.path.isdir(figures_path_extended):
+        os.mkdir(figures_path_extended)
+    # creates subfolder for different tests using same settings i.e. figures\\speech\\CLASSIFIER_NAME\\targeted\\0.50\\I
+    figures_path_extended = os.path.join(figures_path_extended, '')
+    while os.path.isdir(figures_path_extended):
+        figures_path_extended += 'I'
+    if not os.path.isdir(figures_path_extended):
+        os.mkdir(figures_path_extended)
+
+
     accuracy = 0 
     accuracy_adversarial = 0
     loss = 0
@@ -42,15 +74,19 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         loss_adversarial += criterion(labels_estimations_adversarial, labels)
         accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
         accuracy_adversarial += torch.mean(labels.eq(torch.max(labels_estimations_adversarial ,dim=1)[1]).float())
-    
+        
+        print('save to csv')
+        predictions = np.hstack((np.expand_dims(labels,-1), np.ones((labels.shape[0],1))*target_id, labels_estimations, labels_estimations_adversarial ))
+        with open(os.path.join(figures_path_extended,'predictions.csv'),'ab') as f:
+            np.savetxt(f, predictions, delimiter=",")
+        
+
     target_name = None
     if targeted:
         target_name = labels_name[target_id]
     
     # TODO fix
     input_type = 'audio'
-    
-        
         #inputs
         #save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
         #    path=figures_path, target_name=target_name)
@@ -61,9 +97,6 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     accuracy /= len(dataloader)
     accuracy_adversarial /= len(dataloader)
 
-    
-    
-    
     if targeted:
         print('Targeted attack: {target_name}')
     else: 
@@ -74,20 +107,10 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     print(f'Accuracy: {accuracy:.2f}')
     print(f'Accuracy (adversarial): {accuracy_adversarial:.2f}')
     
-    try:
-        os.mkdir(figures_path + '\\' +model.model.__str__().split('(\n')[0])
-    except:
-        None
+    # saving to folder 
 
-    if targeted:
-        figures_path_extended = figures_path + '\\' +model.model.__str__().split('(\n')[0] + '\\targeted'
-    else:
-        figures_path_extended  = figures_path + '\\' +model.model.__str__().split('(\n')[0] + '\\untargeted'
 
-    while os.path.isdir(figures_path_extended):
-        figures_path_extended += 'I'
 
-    os.mkdir(figures_path_extended)
     
     f = open(figures_path_extended + '\\' + "results.txt", "a")
     if targeted:
@@ -217,7 +240,7 @@ def evaluate():
 
     # load the checkpoint, if any 
     checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
-    if os.path.isfile(checkpoint_path):  
+    if os.path.isfile(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
@@ -228,6 +251,7 @@ def evaluate():
 
     checkpoint_path_adversary_model = os.path.join(models_path, args.adversary_model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path_adversary_model):
+        
         checkpoint = torch.load(checkpoint_path_adversary_model)
         adversary_model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
