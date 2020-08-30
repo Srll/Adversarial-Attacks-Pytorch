@@ -25,8 +25,12 @@ def create_speech_commands_dataset_atlas(directory, force=False):
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
 
             paths['train'] += path_names[:int(len(path_names)*0.85)]
+            #print(int(len(path_names)*0.85))
             paths['validation'] += path_names[int(len(path_names)*0.995):]
-        
+            #paths['validation'] += path_names[int(len(path_names)*0.999):]
+            #paths['validation'] += path_names[int(len(path_names)*0.975):]
+            #paths['validation'] += path_names[int(len(path_names)*0.85):]
+            
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
         

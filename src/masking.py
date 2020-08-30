@@ -166,35 +166,32 @@ def get_masking_threshold(x):
 
 
         # remove weak maskers within 0.5 bark
-        
         TM = P_TM>NEGATIVE_INF
         order = np.argsort(P_TM)[::-1]
-        bark_of_max_TM = f_to_bark(f_steps[order][TM])
+        bark_of_max_TM = f_to_bark(f_steps)[order]
         bark_of_NM = f_to_bark(CB_f_mean)
-        for k, bark in enumerate(bark_of_max_TM):
+        
+        for k, bark in enumerate(bark_of_max_TM[:np.count_nonzero(TM)]):
             # check closest TM
             
-            TM_val = P_TM[TM][k]
+            TM_val = P_TM[order][k]
             TM_val_within_range = np.where(np.abs(bark - bark_of_max_TM) < 0.5)[0] # all of these lay within 0.5 bark
-            
-            # TODO start with strongest
-            # np.sort(TM_val[TM_val_within_range]) # sort so we check strongest value first
             
             
             # compare TM_val to all within 0.5 bark range
-            for idx in TM_val_within_range:
-                if TM_val < P_TM[order][idx]:
+            for idx_tm in TM_val_within_range:
+                if TM_val < P_TM[order][idx_tm]:
                     P_TM[order][k] = NEGATIVE_INF
             
 
 
             # also check closest NM (we only look at closest since we know these are spread ~1 bark apart)
-            NM_idx = np.argmin(np.abs(bark_of_NM - bark))
-            NM_val = P_NM[NM_idx]
+            idx_nm = np.argmin(np.abs(bark_of_NM - bark))
+            NM_val = P_NM[idx_nm]
             if TM_val < NM_val:
-                P_TM[TM][idx] = NEGATIVE_INF
+                P_TM[order][k] = NEGATIVE_INF
             else:
-                P_NM[NM_idx] = NEGATIVE_INF
+                P_NM[idx_nm] = NEGATIVE_INF
             
         
         # ========================= STEP 4 ===============================
@@ -244,10 +241,13 @@ def get_masking_threshold(x):
         MASK_32[12:29,t_idx] = np.min(np.reshape(MASK_106[72:106],(17,2)), axis=1)
         MASK_32[29:,t_idx] = MASK_106[105]
         
+        
         #plt.plot(f_steps,P_n)
         #plt.plot(Fs/2/32*np.linspace(0,32,32),MASK_32[:,t_idx])
         #plt.plot(f_steps[1:],quiet_threshold(f_steps[1:]))
         #plt.show()
+
+
         MASK_32[MASK_32 > 96] = 96
     return MASK_32
 

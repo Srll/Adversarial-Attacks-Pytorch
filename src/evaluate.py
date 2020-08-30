@@ -220,14 +220,14 @@ def evaluate():
     
     global figures_path
     figures_path = args.images_dir + args.dataset_name
-    model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
     
+    # specify the model used for evaluation, and the model used for generating adversarial examples
+    model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
     if args.adversary_model_name != 'none':
         adversary_model = networks.CNN(args.adversary_model_name,dataset_name=args.dataset_name)
     else: # use same model for generating adversaries and evaluating
         adversary_model = model
     
-    # adversary_model = networks.CNN(args.model_name,dataset_name=args.dataset_name, preprocess_sequence=args.preprocessing_model_sequence)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
     dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
@@ -251,7 +251,6 @@ def evaluate():
 
     checkpoint_path_adversary_model = os.path.join(models_path, args.adversary_model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path_adversary_model):
-        
         checkpoint = torch.load(checkpoint_path_adversary_model)
         adversary_model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
