@@ -15,7 +15,8 @@ import audio_utils
 def create_speech_commands_dataset_atlas(directory, force=False):
     ''' http://download.tensorflow.org/data/speech_commands_v0.01.tar.gz '''
     
-    
+
+
     if not os.path.isfile(os.path.join(directory,'audio_atlas.pkl')):
         
         paths = {'train': list(), 'validation': list()}
@@ -26,9 +27,17 @@ def create_speech_commands_dataset_atlas(directory, force=False):
 
             paths['train'] += path_names[:int(len(path_names)*0.85)]
             #print(int(len(path_names)*0.85))
-            paths['validation'] += path_names[int(len(path_names)*0.995):]
+            
+            # 20
             #paths['validation'] += path_names[int(len(path_names)*0.999):]
+            
+            # 100
+            paths['validation'] += path_names[int(len(path_names)*0.995):]
+            
+            # 500
             #paths['validation'] += path_names[int(len(path_names)*0.975):]
+            
+            # TRAIN
             #paths['validation'] += path_names[int(len(path_names)*0.85):]
             
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
@@ -38,6 +47,31 @@ def create_speech_commands_dataset_atlas(directory, force=False):
         name_to_label = {'yes':0, 'no':1, 'up':2, 'down':3, 'left':4, 'right':5, 'on':6, 'off':7, 'stop':8, 'go':9}
         with open(os.path.join(directory,'name_to_label.pkl'), 'wb') as file:
             pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
+
+
+def create_speech_commands_dataset_atlas_eval(directory, force=False):
+    ''' http://download.tensorflow.org/data/speech_commands_v0.01.tar.gz '''
+
+    
+    if not os.path.isfile(os.path.join(directory,'audio_atlas.pkl')):
+        
+        paths = {'train': list(), 'validation': list()}
+        
+        for class_name in os.listdir(directory):
+            folder_name = os.path.join(directory, class_name)
+            path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
+            
+            paths['train'] += path_names
+            paths['validation'] += path_names
+            
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
+            pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
+        
+    if not os.path.isfile(os.path.join(directory,'name_to_label.pkl')):
+        name_to_label = {'yes':0, 'no':1, 'up':2, 'down':3, 'left':4, 'right':5, 'on':6, 'off':7, 'stop':8, 'go':9}
+        with open(os.path.join(directory,'name_to_label.pkl'), 'wb') as file:
+            pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
+
 
 def create_FMA_small_dataset_atlas(directory, force=False):
     if not os.path.isfile(os.path.join(directory,'audio_atlas.pkl')):
@@ -173,7 +207,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
         self.input_size = input_size
         
-        
+
 
     def __len__(self):
         return len(self.labels)
@@ -189,6 +223,243 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
+
+class SpeechCommandDataset_eval_RG_targeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_LG_untargeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_LG_targeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+        
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_RG_untargeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_RG_targeted_clean(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        return audio, label
+class SpeechCommandDataset_eval_LG_untargeted_clean(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_LG_targeted_clean(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+        
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_RG_untargeted_clean(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        
+        return audio, label
+
+
 
 class MnistDataset(torch.utils.data.Dataset):
     def __init__(self, image_directory, input_size, train=True, transform=None, force=False):
@@ -282,6 +553,22 @@ def get_dataset(dataset_name, dataset_path, input_size = 28, train = True):
 
     if dataset_name == 'speech':
         return SpeechCommandDataset(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_untargeted':
+        return SpeechCommandDataset_eval_LG_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_untargeted':
+        return SpeechCommandDataset_eval_RG_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_targeted':
+        return SpeechCommandDataset_eval_LG_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_targeted':
+        return SpeechCommandDataset_eval_RG_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_untargeted_clean':
+        return SpeechCommandDataset_eval_LG_untargeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_untargeted_clean':
+        return SpeechCommandDataset_eval_RG_untargeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_targeted_clean':
+        return SpeechCommandDataset_eval_LG_targeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_targeted_clean':
+        return SpeechCommandDataset_eval_RG_targeted_clean(dataset_path, input_size, train)
     elif dataset_name == 'dogscats':
         return DogsCatsDataset(dataset_path, input_size, train)
     elif dataset_name == 'imagenet':
@@ -342,7 +629,7 @@ def get_args_train():
     parser.add_argument('--learning_rate', type = float, default = 0.03, 
         help = 'learning rate of the training algorithm (Adam)')
     parser.add_argument('--verbose_rate', type = int, default = 250, 
-        help = 'number of iterations to show preliminar results and store the model')
+        help = 'number of iterations to show preliminary results and store the model')
     parser.add_argument('--gpu', dest='gpu', action='store_true',
         help = 'If flag is present the program will use available CUDA device')
 
@@ -382,7 +669,7 @@ def get_args_evaluate():
         help = 'folder to store the models') 
     parser.add_argument('--datasets_dir', default = '..'+os.sep+'Datasets'+os.sep,
         help = 'folder where the datasets are stored') 
-    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
+    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','speech_eval_RG_targeted','speech_eval_RG_untargeted','speech_eval_LG_targeted','speech_eval_LG_untargeted','speech_eval_RG_targeted_clean','speech_eval_RG_untargeted_clean','speech_eval_LG_targeted_clean','speech_eval_LG_untargeted_clean','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
             'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'

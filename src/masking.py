@@ -117,7 +117,7 @@ def f_to_bark(f):
 def get_masking_threshold(x):   
     Fs = 44100
     CB_f = [0,100,200,300,400,510,630,770,920, 1080,1270,1480,1720,2000,2320,2700,3150, 3700,4400,5300,6400,7700,9500,12000,15500]
-    CB_f_mean = np.array([(CB_f[i] + CB_f[i+1])/2 for i in range(len(CB_f)-1)])
+    CB_f_mean = np.array([int(np.sqrt(CB_f[i] * CB_f[i+1])/(44100/512))*(44100/512) for i in range(len(CB_f)-1)]) # geometric mean
     
     # constants
     N = 512

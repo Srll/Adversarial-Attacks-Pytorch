@@ -23,6 +23,8 @@ args = utils.get_args_evaluate()
 
 def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, target_id=3, input_type = 'images'):
     # create new folder to save results
+    if not os.path.isdir(figures_path):
+        os.mkdir(figures_path)
     
     figures_path_extended = os.path.join(figures_path, model.model.__str__().split('(\n')[0])
     # creates subfolder for classifier i.e. figures\\speech\\CLASSIFIER_NAME
@@ -74,9 +76,9 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         loss_adversarial += criterion(labels_estimations_adversarial, labels)
         accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
         accuracy_adversarial += torch.mean(labels.eq(torch.max(labels_estimations_adversarial ,dim=1)[1]).float())
-        
+
         print('save to csv')
-        predictions = np.hstack((np.expand_dims(labels,-1), np.ones((labels.shape[0],1))*target_id, labels_estimations, labels_estimations_adversarial ))
+        predictions = np.hstack((np.expand_dims(labels,-1), np.ones((labels.shape[0],1))*target_id, labels_estimations.detach().numpy(), labels_estimations_adversarial.detach().numpy()))
         with open(os.path.join(figures_path_extended,'predictions.csv'),'ab') as f:
             np.savetxt(f, predictions, delimiter=",")
         
@@ -90,7 +92,7 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         #inputs
         #save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
         #    path=figures_path, target_name=target_name)
-
+    
 
     loss /= len(dataloader)
     loss_adversarial /= len(dataloader)
@@ -184,10 +186,10 @@ def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None
 
 def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
     for i in range (x.shape[0]):
-        divider = torch.max(x[i] + adv_noise[i] + x_adv[i]) 
-        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'.wav'), 16000, (x[i]/divider).numpy())
-        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'_adv.wav'), 16000, (x_adv[i]/divider).numpy())
-        scipy.io.wavfile.write(os.path.join(path, 'adv_noise'+str(i)+'.wav'), 16000, (adv_noise[i]/divider).numpy())
+        #divider = torch.max(x[i] + adv_noise[i] + x_adv[i]) 
+        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'.wav'), 16000, x[i].numpy().astype(np.int16))
+        scipy.io.wavfile.write(os.path.join(path, 'x'+str(i)+'_adv.wav'), 16000, x_adv[i].numpy().astype(np.int16))
+        scipy.io.wavfile.write(os.path.join(path, 'adv_noise'+str(i)+'.wav'), 16000, adv_noise[i].numpy().astype(np.int16))
     
     pre = preprocess.PreProcess(['spectrogram'])
 
@@ -215,7 +217,8 @@ def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None)
 def evaluate():
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name 
-    models_path = args.models_dir + args.dataset_name 
+    
+    models_path = args.models_dir + args.dataset_name
     # adversary_models_path = args.models_dir + args.dataset_name 
     
     global figures_path
@@ -237,10 +240,15 @@ def evaluate():
     # obtain the criterion used for training 
     global criterion
     criterion = torch.nn.CrossEntropyLoss()
-
-    # load the checkpoint, if any 
+    
+    models_path = '..\\Models\\speech'
+    print(os.path.join(models_path,args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt'))
+    
+    # load the checkpoint, if any
     checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path):
+        print('LOADED! press enter')
+        input()
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
@@ -269,8 +277,8 @@ def evaluate():
     # evaluate the model 
     input_type = args.model_name.split('_')[0]
     
-    evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
-    #evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
+    #evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
+    evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
 
 if __name__ == "__main__":
     evaluate()
