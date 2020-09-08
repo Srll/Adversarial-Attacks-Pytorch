@@ -54,7 +54,10 @@ class AdversarialGenerator(object):
         else: # evaluate
             
             if adversarial_type == 'none':
-                return x, torch.zeros_like(x), self.model(x), self.model(x)
+                x.detach()
+                with torch.no_grad(): 
+                    y_estimate = torch.nn.functional.softmax(self.model(x),dim=1)   
+                return x, torch.zeros_like(x), y_estimate,y_estimate
             elif adversarial_type == 'FGSM_vanilla':
                 x_adv, x_delta, y_estimate_adv, y_estimate = self.generate_adversarial_FGSM_vanilla(x, target, targeted, eps, x_min, x_max, train)
             elif adversarial_type == 'PGD':
@@ -233,7 +236,7 @@ class AdversarialGenerator(object):
 
         with torch.no_grad(): 
             y_estimate_adversarial = torch.nn.functional.softmax(self.model(x_adv),dim=1)
-            y_estimate = torch.nn.functional.softmax(self.model(x_original.to(torch.float32)),dim=1)        
+            y_estimate = torch.nn.functional.softmax(self.model(x_original.to(torch.float32)),dim=1)
         noise = x_adv - x_original
         return x_adv.to(torch.float32), noise.to(torch.float32), y_estimate_adversarial.to(torch.float32), y_estimate.to(torch.float32)
 

@@ -442,9 +442,11 @@ class CNN(torch.nn.Module):
         self.GPU_enabled = False
         self.preprocess_bool = False
 
-        if dataset_name == 'speech':
+        if 'speech' in dataset_name:
             classes = 10
             input_length = 16000
+        
+
         elif dataset_name == 'dogscats':
             classes = 2 
         elif dataset_name == 'imagenet':
