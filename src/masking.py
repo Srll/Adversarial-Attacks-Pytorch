@@ -112,7 +112,7 @@ def db2mag(x):
 
 
 def f_to_bark(f):
-    return 13*np.arctan(0.76*f / 1000) + 3.5*np.square(np.arctan(f/7500))
+    return 13*np.arctan(0.76*f / 1000) + 3.5*np.arctan(np.square(f/7500))
 
 def get_masking_threshold(x):   
     Fs = 44100
@@ -209,8 +209,9 @@ def get_masking_threshold(x):
 
         for k, maskee_bark in enumerate(maskees_bark):
             # get TM for k
+            
             for idx in np.where(P_TM>NEGATIVE_INF)[0]:
-                masker_bark = f_to_bark(idx * Fs/2 * 256)
+                masker_bark = f_to_bark(idx * Fs/2 / 256)
                 if (masker_bark - maskee_bark < 8) and (masker_bark - maskee_bark > -3):               
                     MASK_106[k] += db2mag(P_TM[idx]
                                 + TM_offset_db(masker_bark)
@@ -225,7 +226,7 @@ def get_masking_threshold(x):
                                 + spreading_function_db(masker_bark, maskee_bark, P_NM[idx]))
 
                     MASK_106[k] += contribution
-                    
+                 
 
         # get threshold in quiet for k
         MASK_106 += db2mag(quiet_threshold(maskees_hz))
@@ -235,11 +236,10 @@ def get_masking_threshold(x):
         #MASK_106[0] = 0
         # ========================= STEP 6 ===============================
         # pick out min from each subband
-
-        MASK_32[0:6,t_idx] = np.min(np.reshape(MASK_106[0:48],(6,8)), axis=1)
-        MASK_32[6:12,t_idx] = np.min(np.reshape(MASK_106[48:72],(6,4)), axis=1)
-        MASK_32[12:29,t_idx] = np.min(np.reshape(MASK_106[72:106],(17,2)), axis=1)
-        MASK_32[29:,t_idx] = MASK_106[105]
+        MASK_32[0:6,t_idx] = np.min(np.reshape(MASK_106[0:48],(6,8)), axis=1).copy()
+        MASK_32[6:12,t_idx] = np.min(np.reshape(MASK_106[48:72],(6,4)), axis=1).copy()
+        MASK_32[12:29,t_idx] = np.min(np.reshape(MASK_106[72:106],(17,2)), axis=1).copy()
+        MASK_32[29:,t_idx] = MASK_106[105].copy()
         
         
         #plt.plot(f_steps,P_n)
@@ -248,7 +248,7 @@ def get_masking_threshold(x):
         #plt.show()
 
 
-        MASK_32[MASK_32 > 96] = 96
+    MASK_32[MASK_32 > 96] = 96
     return MASK_32
 
 

@@ -8,6 +8,7 @@ from scipy.io.wavfile import read as wavread
 import argparse
 import os.path
 import audio_utils 
+import random
 
 #####################
 #   Dataset Utils   #
@@ -15,31 +16,24 @@ import audio_utils
 def create_speech_commands_dataset_atlas(directory, force=False):
     ''' http://download.tensorflow.org/data/speech_commands_v0.01.tar.gz '''
     
-
-
     if not os.path.isfile(os.path.join(directory,'audio_atlas.pkl')):
         
-        paths = {'train': list(), 'validation': list()}
+        paths = {'train': list(), 'validation': list(), 'evaluation': list()}
         
         for class_name in os.listdir(directory):
             folder_name = os.path.join(directory, class_name)
             path_names = [os.path.join(folder_name,v) for v  in os.listdir(folder_name)]
+            
+            random.shuffle(path_names)
 
-            paths['train'] += path_names[:int(len(path_names)*0.85)]
-            #print(int(len(path_names)*0.85))
+            paths['train'] += path_names[:int(len(path_names)*0.8)]
             
-            # 20
-            #paths['validation'] += path_names[int(len(path_names)*0.999):]
+            paths['validation'] += path_names[int(len(path_names)*0.8):int(len(path_names)*0.95)]
             
-            # 100
-            paths['validation'] += path_names[int(len(path_names)*0.995):]
-            
-            # 500
-            #paths['validation'] += path_names[int(len(path_names)*0.975):]
-            
-            # TRAIN
-            #paths['validation'] += path_names[int(len(path_names)*0.85):]
-            
+            paths['evaluation'] += path_names[int(len(path_names)*0.95):]
+        print(len(paths['train']))
+        print(len(paths['validation']))
+        print(len(paths['evaluation']))
         with open(os.path.join(directory,'audio_atlas.pkl'), 'wb') as file:
             pickle.dump(paths, file, pickle.HIGHEST_PROTOCOL)
         
@@ -186,18 +180,106 @@ class FMAsmallDataset(torch.utils.data.Dataset):
         audio = np.array(audio_object.get_array_of_samples())
         audio = audio.astype(np.float32)
         
-        #audio = audio_utils.zeropad(audio, int(2644992/3)) # 10 seconds
-        audio = audio_utils.zeropad(audio, int(2644992/12)) # 2.5 seconds
+        audio = audio_utils.zeropad(audio, int(2644992/3)) # 10 seconds
+
         label = self.labels[idx]
         
         return audio, label
 
 class SpeechCommandDataset(torch.utils.data.Dataset):
 
-    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+    def __init__(self, directory, input_size, train=True, transform=None, force=False, evaluation=False):
 
         create_speech_commands_dataset_atlas(directory)
         with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            if train:
+                self.audio_paths = pickle.load(file)['train']
+            elif evaluation:
+                self.audio_paths = pickle.load(file)['evaluation']
+            else:
+                self.audio_paths = pickle.load(file)['validation']
+                
+
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+        
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        
+        label = self.labels[idx]
+        
+        return audio, label
+
+class SpeechCommandDataset_eval_RGAP_32_targeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_RGAP_32_untargeted(torch.utils.data.Dataset):
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_LGAP_32_targeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
             self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
         with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
             name_to_label = pickle.load(file)
@@ -207,7 +289,63 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
         self.input_size = input_size
         
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
 
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_LGAP_32_untargeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+        
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        return audio, label
+
+class SpeechCommandDataset_eval_RGAP_targeted_clean(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
 
     def __len__(self):
         return len(self.labels)
@@ -216,15 +354,13 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         audio_path = self.audio_paths[idx]
         fs, audio = wavread(audio_path)
         audio = audio.astype(np.float32)
-        
+        audio = audio*1
         audio = audio_utils.zeropad(audio, 16128) # 1 seconds
         #audio = audio_utils.resample_to_44100(audio, fs)
-        
-        label = self.labels[idx]
-        
-        return audio, label
 
-class SpeechCommandDataset_eval_RG_targeted(torch.utils.data.Dataset):
+        label = self.labels[idx]
+        return audio, label
+class SpeechCommandDataset_eval_LGAP_untargeted_clean(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -253,152 +389,7 @@ class SpeechCommandDataset_eval_RG_targeted(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
-class SpeechCommandDataset_eval_LG_untargeted(torch.utils.data.Dataset):
-
-    def __init__(self, directory, input_size, train=True, transform=None, force=False):
-
-        create_speech_commands_dataset_atlas_eval(directory)
-        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
-            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
-        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
-            name_to_label = pickle.load(file)
-
-        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
-        
-        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
-        self.input_size = input_size
-
-    def __len__(self):
-        return len(self.labels)
-    
-    def __getitem__(self, idx):
-        audio_path = self.audio_paths[idx]
-        fs, audio = wavread(audio_path)
-        audio = audio.astype(np.float32)
-        audio = audio*1
-        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
-        #audio = audio_utils.resample_to_44100(audio, fs)
-
-        label = self.labels[idx]
-        
-        return audio, label
-class SpeechCommandDataset_eval_LG_targeted(torch.utils.data.Dataset):
-
-    def __init__(self, directory, input_size, train=True, transform=None, force=False):
-
-        create_speech_commands_dataset_atlas_eval(directory)
-        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
-            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
-        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
-            name_to_label = pickle.load(file)
-
-        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
-        
-        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
-        self.input_size = input_size
-        
-    def __len__(self):
-        return len(self.labels)
-    
-    def __getitem__(self, idx):
-        audio_path = self.audio_paths[idx]
-        fs, audio = wavread(audio_path)
-        audio = audio.astype(np.float32)
-        audio = audio*1
-        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
-        #audio = audio_utils.resample_to_44100(audio, fs)
-
-        label = self.labels[idx]
-        
-        return audio, label
-class SpeechCommandDataset_eval_RG_untargeted(torch.utils.data.Dataset):
-
-    def __init__(self, directory, input_size, train=True, transform=None, force=False):
-
-        create_speech_commands_dataset_atlas_eval(directory)
-        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
-            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
-        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
-            name_to_label = pickle.load(file)
-
-        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
-        
-        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
-        self.input_size = input_size
-
-    def __len__(self):
-        return len(self.labels)
-    
-    def __getitem__(self, idx):
-        audio_path = self.audio_paths[idx]
-        fs, audio = wavread(audio_path)
-
-        audio = audio.astype(np.float32)
-        audio = audio*1
-        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
-        #audio = audio_utils.resample_to_44100(audio, fs)
-
-        label = self.labels[idx]
-        
-        return audio, label
-class SpeechCommandDataset_eval_RG_targeted_clean(torch.utils.data.Dataset):
-
-    def __init__(self, directory, input_size, train=True, transform=None, force=False):
-
-        create_speech_commands_dataset_atlas_eval(directory)
-        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
-            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
-        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
-            name_to_label = pickle.load(file)
-        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
-        
-        
-        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
-        self.input_size = input_size
-
-    def __len__(self):
-        return len(self.labels)
-    
-    def __getitem__(self, idx):
-        audio_path = self.audio_paths[idx]
-        fs, audio = wavread(audio_path)
-        audio = audio.astype(np.float32)
-        audio = audio*1
-        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
-        #audio = audio_utils.resample_to_44100(audio, fs)
-
-        label = self.labels[idx]
-        return audio, label
-class SpeechCommandDataset_eval_LG_untargeted_clean(torch.utils.data.Dataset):
-
-    def __init__(self, directory, input_size, train=True, transform=None, force=False):
-
-        create_speech_commands_dataset_atlas_eval(directory)
-        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
-            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
-        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
-            name_to_label = pickle.load(file)
-
-        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
-        
-        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
-        self.input_size = input_size
-
-    def __len__(self):
-        return len(self.labels)
-    
-    def __getitem__(self, idx):
-        audio_path = self.audio_paths[idx]
-        fs, audio = wavread(audio_path)
-        audio = audio.astype(np.float32)
-        audio = audio*1
-        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
-        #audio = audio_utils.resample_to_44100(audio, fs)
-
-        label = self.labels[idx]
-        
-        return audio, label
-class SpeechCommandDataset_eval_LG_targeted_clean(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_LGAP_targeted_clean(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -429,7 +420,7 @@ class SpeechCommandDataset_eval_LG_targeted_clean(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
-class SpeechCommandDataset_eval_RG_untargeted_clean(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_RGAP_untargeted_clean(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -549,26 +540,26 @@ class SelectedImagenetDataset(torch.utils.data.Dataset):
         
         return image, label
 
-def get_dataset(dataset_name, dataset_path, input_size = 28, train = True):
+def get_dataset(dataset_name, dataset_path, input_size = 28, train = True, evaluation=False):
 
     if dataset_name == 'speech':
-        return SpeechCommandDataset(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_LG_untargeted':
-        return SpeechCommandDataset_eval_LG_untargeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RG_untargeted':
-        return SpeechCommandDataset_eval_RG_untargeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_LG_targeted':
-        return SpeechCommandDataset_eval_LG_targeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RG_targeted':
-        return SpeechCommandDataset_eval_RG_targeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_LG_untargeted_clean':
-        return SpeechCommandDataset_eval_LG_untargeted_clean(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RG_untargeted_clean':
-        return SpeechCommandDataset_eval_RG_untargeted_clean(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_LG_targeted_clean':
-        return SpeechCommandDataset_eval_LG_targeted_clean(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RG_targeted_clean':
-        return SpeechCommandDataset_eval_RG_targeted_clean(dataset_path, input_size, train)
+        return SpeechCommandDataset(dataset_path, input_size, train, evaluation=evaluation)
+    elif dataset_name == 'speech_eval_LGAP_untargeted':
+        return SpeechCommandDataset_eval_LGAP_32_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RGAP_untargeted':
+        return SpeechCommandDataset_eval_RGAP_32_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LGAP_targeted':
+        return SpeechCommandDataset_eval_RGAP_32_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RGAP_targeted':
+        return SpeechCommandDataset_eval_RGAP_32_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LGAP_untargeted_clean':
+        return SpeechCommandDataset_eval_LGAP_untargeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RGAP_untargeted_clean':
+        return SpeechCommandDataset_eval_LGAP_untargeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LGAP_targeted_clean':
+        return SpeechCommandDataset_eval_LGAP_targeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RGAP_targeted_clean':
+        return SpeechCommandDataset_eval_RGAP_targeted_clean(dataset_path, input_size, train)
     elif dataset_name == 'dogscats':
         return DogsCatsDataset(dataset_path, input_size, train)
     elif dataset_name == 'imagenet':
@@ -602,7 +593,7 @@ def convert_to_rgb(im):
 def get_args_train():
     '''
     This function returns the arguments from terminal and set them to display
-    ''' 
+    '''
 
     parser = argparse.ArgumentParser(
         description = 'Adversarial attacks (training and evaluation) in Pytorch', 
@@ -619,7 +610,7 @@ def get_args_train():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ','audio_F7','audio_F10', 'audio_conv2d_mfcc',  'audio_conv2d_spectrogram'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5', 'audio_MJ','audio_F7','audio_F7_base','audio_F10', 'audio_conv2d_mfcc',  'audio_conv2d_spectrogram'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--n_iterations', type = int, default = 2000, 
@@ -636,7 +627,7 @@ def get_args_train():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'GL', 'GL_masking','brute_force_mask', 'brute_force_mask_reduce'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'LGAP','RGAP'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -645,7 +636,7 @@ def get_args_train():
         help = 'minimum value of the input variable')
     parser.add_argument('--max_value_input', type = float, default = 1.0, 
         help = 'maximum value of the input variable')
-    parser.add_argument('--n_steps_adv', type = int, default = 7, 
+    parser.add_argument('--n_steps_adv', type = int, default = 7,
         help = 'number of steps for the iterative adversarial algorithms')
 
     
@@ -672,30 +663,34 @@ def get_args_evaluate():
     parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','speech_eval_RG_targeted','speech_eval_RG_untargeted','speech_eval_LG_targeted','speech_eval_LG_untargeted','speech_eval_RG_targeted_clean','speech_eval_RG_untargeted_clean','speech_eval_LG_targeted_clean','speech_eval_LG_untargeted_clean','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F7_base','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
         ], default= 'images_shufflenetv2',
         help = 'model used in the experiments')
     parser.add_argument('--batch_size', type = int, default = 32, 
         help = 'number of samples in each batch')
+    parser.add_argument('--n_samples_adv', type = int, default = 100,
+        help = 'number of adversaries to generate')
     parser.add_argument('--gpu', dest='gpu', action='store_true',
         help = 'If flag is present the program will use available CUDA device')
+    parser.add_argument('--targeted', dest='targeted', action='store_true',
+        help = 'Targeted attack or not')
     parser.set_defaults(feature=False)
     
     # Transferability parsing
     parser.add_argument('--adversary_model_name', choices = [
-            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
+            'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F7_base','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'
         ], default = 'none',
         help = 'model used for generating adversarial examples when testing transferability')
 
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask','brute_force_mask_reduce'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','LGAP','RGAP'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     # Adversarial attack parsing 
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','GL','GL_masking','brute_force_mask','brute_force_mask_reduce'
+            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','LGAP','RGAP'
         ], default = 'FGSM_vanilla',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 

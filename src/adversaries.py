@@ -16,11 +16,8 @@ class AdversarialGenerator(object):
         self.criterion = criterion 
         
     
-    def generate_adversarial(self, adversarial_type, x, target, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.03, n_steps = 7, train = False, target_id=3):
-
-        
-        if train:
-            
+    def generate_adversarial(self, adversarial_type, x, target, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.03, n_steps = 7, train = False, target_id=3):        
+        if train:    
             if adversarial_type == 'none':
                 return x
             elif adversarial_type == 'FGSM_vanilla':
@@ -52,7 +49,6 @@ class AdversarialGenerator(object):
             return x_adv
 
         else: # evaluate
-            
             if adversarial_type == 'none':
                 x.detach()
                 with torch.no_grad(): 
@@ -71,10 +67,10 @@ class AdversarialGenerator(object):
             elif adversarial_type == 'GL':
                 self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram','insert_data_dim','mag2db96'])
                 x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_GL_batch(x, target, targeted,eps, 0, 0, train=train, mask=False)
-            elif adversarial_type == 'GL_masking':
+            elif adversarial_type == 'LGAP':
                 self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram','insert_data_dim','mag2db96'])
                 x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_GL_batch(x, target, targeted,eps, 0,0,train=train, mask=True)
-            elif adversarial_type == 'brute_force_mask':
+            elif adversarial_type == 'RGAP':
                 #self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram','insert_data_dim','mag2db96'])
                 self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram', 'insert_data_dim', 'mag2db96'])
                 x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_brute_force(x, target, targeted, eps, 20, train=train)
@@ -87,7 +83,7 @@ class AdversarialGenerator(object):
                 print('Not yet implemente')
             return x_adv, x_delta, y_estimate_adv, y_estimate
 
-
+    
     
     def generate_adversarial_brute_force(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,train=False):
         PLOT = True
@@ -99,7 +95,9 @@ class AdversarialGenerator(object):
         
 
         F_RESOLUTION = int(self.adversarial_preprocess.stft_n_fft/2) + 1
-        
+        #import pdb; pdb.set_trace()
+        print(F_RESOLUTION)
+
         F_MIN = 0 #int(np.floor(500 / (FS_Z/2) * F_RESOLUTION))              # limit lowest frequency perturbation to 500 hz
         F_MAX = int(np.ceil(F_RESOLUTION * FS_MODEL/(FS_Z)))    # limit highest frequency perturbation to half of models sampling frequency
         
@@ -127,16 +125,23 @@ class AdversarialGenerator(object):
         
         print("Calculating masking threshold")
 
-        if QUICK:
-            m_32 = np.ones(np.squeeze(z_invertable).shape) * 96
-        else:
-            m_32 = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
-        
+        m_original = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
+        m_32 = np.zeros((m_original.shape[0],m_original.shape[1]+1,m_original.shape[2]))
+        m_32[:,:-1,:] = m_original.copy()
+        m_32 = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
+
         COLOR_LIST = ['salmon','olive','darkgreen','khaki','black','grey','orange','maroon','sandybrown','lightblue','purple','pink','yellow','royalblue','tan','cyan','blue','red','violet','silver','gold']    
         # mask processing
         m_2d = signal.resample(m_32,MAX_POS[1],axis=-1)     # resample to same time resolution
         m_2d = signal.resample(m_2d,F_RESOLUTION,axis=1)    # resample to same frequency resolution
         
+        """
+        m_time = self.adversarial_preprocess.inverse(np.expand_dims(m_2d,axis=1))
+        m_time_int = m_time.numpy().astype('int16')
+        plt.specgram(m_time_int[0], 512, 16000)
+        plt.show()
+        import pdb; pdb.set_trace()
+        """
         m_1d = np.reshape(m_2d, (N_BATCH, np.prod(MAX_POS)))
         m_1d[m_1d > 96] = 96
         m_1d_mag = db2mag(m_1d)
@@ -214,12 +219,12 @@ class AdversarialGenerator(object):
                 plt.show()
                 plt.pause(0.0001)
         if PLOT:
-            plt.savefig('Accuracy_RG_N32_'+str(int(eps))+str(targeted) + '.png')
+            plt.savefig('output\\Accuracy_RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted) + '.png')
 
         
-        with open('U_count_RG_N32_'+str(int(eps))+str(targeted) + '.txt','ab+') as f:
+        with open('output\\U_count_RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted) + '.txt','ab+') as f:
             np.savetxt(f, np.count_nonzero(z_1d_original - z_1d_adv,axis=(1,2)))
-        with open('Accuracy_RG_N32_'+str(int(eps))+str(targeted) + '.csv','ab+') as f:
+        with open('output\\Accuracy_RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted) + '.csv','ab+') as f:
             np.savetxt(f, accuracy, delimiter=",")
         
         
@@ -259,14 +264,17 @@ class AdversarialGenerator(object):
         N_BATCH = z_shape[0]
         accuracy = np.zeros((N_BATCH, 0))
         
+        with torch.no_grad():
+            pred_best = np.array(np.diag(torch.nn.functional.softmax(self.model(x_original.numpy()), dim=1).numpy()[:,y]))
+        accuracy = np.hstack((accuracy, np.expand_dims(pred_best, -1)))
+
         z_2d = signal.resample(z,F_RESOLUTION,axis=2)
         
 
-        if mask == True:
-            print("Calculating masking threshold")
-            m = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
-        else:
-            m = np.ones_like(z_2d) * (96-20)
+
+        m_original = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
+        m = np.zeros((m_original.shape[0],m_original.shape[1]+1,m_original.shape[2]))
+        m[:,:-1,:] = m_original
         
         
         #m_2d_mag = db2mag(m)
@@ -277,6 +285,8 @@ class AdversarialGenerator(object):
         N_dimensions_position = len(z_shape) - 2 # subtract batch and data dim
         max_pos = z_2d.shape[2:]
         
+        EARLY_STOP = True
+        active = np.arange(0,N_BATCH)
         N_neighbors = 5
         PLOT = True
 
@@ -284,15 +294,11 @@ class AdversarialGenerator(object):
             plt.axis([0, N_loops, 0, 1])
             plt.ion()
         
-        def add_pixels(z, pixels):
+        def add_pixels(z, pixels, active):
+            
             z_perturbed = z.copy()
-            
-            #for b in range(N_BATCH):
-            #    for i in range(N_pixels):
-            #        z_perturbed[b,0,pixels[b,i,0],pixels[b,i,1]] = mag2db(np.abs(db2mag(z_perturbed[b,0,pixels[b,i,0],pixels[b,i,1]]) + pixels[b,i,2] * m_2d_mag[b,pixels[b,i,0],pixels[b,i,1]]))
-            
             z_perturbed[pixels[:,:,0],pixels[:,:,1],pixels[:,:,2],pixels[:,:,3]] = mag2db(np.abs(db2mag(z_perturbed[pixels[:,:,0],pixels[:,:,1],pixels[:,:,2],pixels[:,:,3]]) + pixels[:,:,4] * m_2d_mag[pixels[:,:,0],pixels[:,:,2],pixels[:,:,3]]))
-            return z_perturbed
+            return z_perturbed[active]
 
         # initialize pixels
         pixels = np.random.rand(N_BATCH, N_pixels, 5) # each pixel has two dimensions (x_pos, y_pos)
@@ -306,6 +312,11 @@ class AdversarialGenerator(object):
 
         pixels_neighbors = np.zeros(pixels.shape[:-1] + (N_neighbors,) + (5,), dtype=np.int)
         
+        with torch.no_grad():
+            z_adv = signal.resample(add_pixels(z_2d,pixels,active),z_shape[2],axis=2)
+            x_pixels = self.adversarial_preprocess.inverse(z_adv).detach()
+            pred_best = np.array(np.diag(torch.nn.functional.softmax(self.model(x_pixels), dim=1).numpy()[:,y[active]]))
+
         # main optimization loops
         for i in range(N_loops):
             # pixels neighbor f, t, neighbor_number, (batch, 0, x, y, specific_eps)
@@ -338,42 +349,48 @@ class AdversarialGenerator(object):
             for p in range(N_pixels):
                 # calculate prediction with current pixel positions
                 with torch.no_grad():
-                    try:
-                        z_adv = signal.resample(add_pixels(z_2d,pixels),z_shape[2],axis=2)
-                        x_pixels = self.adversarial_preprocess.inverse(z_adv).detach()
-                        pred_best = np.array(np.diag(torch.nn.functional.softmax(self.model(x_pixels), dim=1).numpy()[:,y]))
-                    except:
-                        import pdb; pdb.set_trace()
+                    z_adv = signal.resample(add_pixels(z_2d,pixels,active),z_shape[2],axis=2)
+                    x_pixels = self.adversarial_preprocess.inverse(z_adv).detach()
+                    pred_best[active] = np.array(np.diag(torch.nn.functional.softmax(self.model(x_pixels), dim=1).numpy()[:,y[active]]))
                 
                 # check what neighbor is best for current pixel
                 for n in range(N_neighbors):
-                    # reset z
-                    
-
+                    # reset z\
 
                     # calculate prediction for current neighbor
-                    with torch.no_grad(): 
+                    with torch.no_grad():
                         temp = pixels[:,p,:].copy() # save original perturbation
                         pixels[:,p,:] = pixels_neighbors[:,p,n,:].copy()
-                        try:
-                            z_neighbor = add_pixels(z_2d,pixels)
-                        except:
-                            import pdb; pdb.set_trace()
-
-                        z_neighbor = signal.resample(z_neighbor,z_shape[2],axis=2)
+                        z_neighbor = add_pixels(z_2d,pixels,active)
                         x_neighbor = self.adversarial_preprocess.inverse(z_neighbor).detach()
                         
-                        pred_neighbor = np.diag(torch.nn.functional.softmax(self.model(x_neighbor), dim=1).numpy()[:,y])
+                        pred_neighbor = np.diag(torch.nn.functional.softmax(self.model(x_neighbor), dim=1).numpy()[:,y[active]])
                         pixels[:,p,:] = temp.copy() # restore to original state
                     
                     if targeted == False:
-                        idxs = np.nonzero(pred_neighbor <= pred_best)[0]
+                        idxs = np.nonzero(pred_neighbor <= pred_best[active])[0]
                     else:
-                        idxs = np.nonzero(pred_neighbor >= pred_best)[0]
+                        idxs = np.nonzero(pred_neighbor >= pred_best[active])[0]
 
-                    pred_best[idxs] = pred_neighbor[idxs].copy()
-                    pixels[idxs,p,:] = pixels_neighbors[idxs,p,n,:].copy() # swap original pixel for improvement
+                    pred_best[active[idxs]] = pred_neighbor[idxs].copy()
+                    pixels[active[idxs],p,:] = pixels_neighbors[active[idxs],p,n,:].copy() # swap original pixel for improvement
                 
+                if EARLY_STOP:
+                    if not targeted:
+                        active_temp = np.nonzero(pred_best > 0.1)[0]
+                        if len(active_temp) == 0:
+                            break
+                        if len(active) != len(active_temp): # if change in active dims, update variables
+                            active = active_temp
+                            self.adversarial_preprocess.forward(x[active]) # update local variables in preprocessing
+                    else:
+                        active_temp = np.nonzero(pred_best < 0.9)[0]
+                        if len(active_temp) == 0:
+                            break
+                        if len(active) != len(active_temp): # if change in active dims, update variables
+                            active = active_temp
+                            self.adversarial_preprocess.forward(x[active]) # update local variables in preprocessing
+                    
             print("----------------")
             print(pred_best)
             
@@ -383,22 +400,17 @@ class AdversarialGenerator(object):
                     plt.show()
                     plt.pause(0.0001)
             accuracy = np.hstack((accuracy, np.expand_dims(pred_best, -1)))
-            with open('Accuracy_LG_N32_'+str(int(eps))+str(targeted) + '.csv','ab+') as f:
-                np.savetxt(f, accuracy, delimiter=",")
+
+        with open('output\\Accuracy_LG_N32_'+str(int(eps))+str(targeted) + '.csv','ab+') as f:
+            np.savetxt(f, accuracy, delimiter=",")
     
         if PLOT:
-            plt.savefig('Accuracy_LG_N32_'+str(int(eps))+str(targeted) + '.png')
-
+            plt.savefig('output\\Accuracy_LG_N32_'+str(int(eps))+str(targeted) + '.png')
         
-        
-        
-
-        if PLOT:
-            plt.savefig('M7_LG.png')
-
-                                
-        z_adv = add_pixels(z_2d,pixels)
+        z_adv = add_pixels(z_2d,pixels,np.arange(0,N_BATCH))
         z_adv = signal.resample(z_adv,z_shape[2],axis=2)
+        
+        self.adversarial_preprocess.forward(x)
         x_adv = self.adversarial_preprocess.inverse(z_adv).detach()
         
         if train:
@@ -417,141 +429,7 @@ class AdversarialGenerator(object):
             
                 
 
-    
-    def generate_adversarial_GL(self, x, y, targeted=False,x_min=0,x_max=1,train=False,N_perturbations=50, N_search=300, mask=True, intitalization_max=False):
-        self.model.eval()
-        x_old = x.clone().detach() # save for evaluation at the end
-        x = self.adversarial_preprocess.forward(x)
-        
-        x_np = x.numpy()
-        if mask == True:
-            print("Calculating mask")
-            m = masking.get_mask_batches(x_old.numpy(), x_np, 16000, x_np.shape[2])
-        else:
-            m = np.ones_like(x_np) * (96-30)
-
-        # get shapes
-        shape = x_np.shape
-        input(shape)
-        # should be (batch, data, ... )
-        
-        N_batch = shape[0]
-        N_dimensions_position = len(shape) - 2 # subtract batch and data dim
-        max_pos = shape[2:]
-
-
-        def get_neighbors(px,py):
-            n = []
-
-            for idx_x in range(-1,2):
-                for idx_y in range(-1,2):
-                    n.append([px+idx_x, py+idx_y])
-            for i in n:
-                i[0] = max(i[0],0)
-                i[0] = min(i[0],max_pos[0]-1)
-                i[1] = max(i[1],0)
-                i[1] = min(i[1],max_pos[1]-1)
-            # add random candidate
-            n.append([np.random.randint(0, max_pos[0]), np.random.randint(0, max_pos[1])])
-            return n
-
-        z_adv = x_np.copy()
-        for b in range(N_batch):
-
-            perturbations = []
-            top_pred = 1
-            print( "=============================================")
-            for i in range(N_perturbations):
-                tested_idxs = [] 
-
-                
-                # initialize all pixels to be close to max magnitude pixel 
-                if intitalization_max == True:
-                    pos_x, pos_y = np.unravel_index(x_np[b,0].argmax(), x_np[b,0].shape)
-                    print("check that both comming values are ints")
-                    input(pos_x)
-                    input(pos_y)
-                    pos_x += int(i/N_perturbations*np.random.rand() * max_pos[0])
-                    pos_y += int(i/N_perturbations*np.random.rand() * max_pos[1])
-                else:
-                    pos_x = int(np.random.rand() * (max_pos[0]-1))
-                    pos_y = int(np.random.rand() * (max_pos[1]-1))
-
-                pos_x = min(max(pos_x, 0), max_pos[0]-1)
-                pos_y = min(max(pos_y, 0), max_pos[1]-1)
-
-                improvement = False
-
-                for s in range(N_search):
-                    counter = s
-                    top_pos_neighbor = []
-                    found_better = False
-                    for n in get_neighbors(pos_x, pos_y):
-                        
-                        """
-                        if n in tested_idxs:
-                            continue
-                        tested_idxs.append(n)
-                        """
-                        
-                        # eval
-                        temp = x_np[b,0, n[0], n[1]]
-                        x_np[b,0, n[0], n[1]] = m[b,0,n[0],n[1]]
-                        
-                        x_perturbed = self.adversarial_preprocess.inverse(x_np).detach()
-                        x_perturbed.unsqueeze(0)
-                        with torch.no_grad():
-                            pred = torch.nn.functional.softmax(self.model(x_perturbed), dim=1).numpy()[b,y[b]]
-                        
-                        if top_pred > pred:
-                            improvement = True
-                            top_pred = pred
-                            top_pos_neighbor = [n[0], n[1]]
-                            found_better = True
-                    
-                        x_np[b, 0, n[0], n[1]] = temp # reset x
-                    
-                    if found_better == True:
-                        # move to new best idx
-                        pos_x = top_pos_neighbor[0]
-                        pos_y = top_pos_neighbor[1]
-                    else:
-                        break
-                
-                
-                # add best perturbation
-                if improvement:
-                    x_np[b,0, pos_x, pos_y] = m[b,0,pos_x,pos_y]
-
-                # early stopping
-                print(counter)
-                print(top_pred)
-                if top_pred < 0.1:
-                    break
-                
-            z_adv[b] = x_np[b]
-
-        x_adv = self.adversarial_preprocess.inverse(z_adv)
-        
-        if train:
-            self.model.train()
-            return x_adv
-
-        
-        with torch.no_grad(): 
-            y_estimate_adversarial = torch.nn.functional.softmax(self.model(x_adv),dim=1) # DO THIS OUTSIDE OF THIS FUNCTION?
-            y_estimate = torch.nn.functional.softmax(self.model(x_old.to(torch.float32)),dim=1)
-            #print(np.diag(y_estimate.numpy()[:,y]) - np.diag(y_estimate_adversarial.numpy()[:,y])) #print difference from original
-            #print(np.diag(y_estimate_adversarial.numpy()[:,y])) # print probabilities adversarial
-
-        
-        noise = x_adv - x_old
-        
-        self.model.train()
-        return x_adv.to(torch.float32), noise.to(torch.float32), y_estimate_adversarial.to(torch.float32), y_estimate.to(torch.float32)
-
-
-                
+      
     def generate_adversarial_DE_masking(self, x, y, targeted=False, x_min=0, x_max=1, train=False, N_perturbations=1, N_iterations=50, N_population=50, mask=True):
         self.model.eval()
         x_old = x.clone().detach() # save for evaluation at the end
@@ -803,6 +681,7 @@ class AdversarialGenerator(object):
         
         return x_adv.to(torch.float32), noise.to(torch.float32), y_estimate_adversarial.to(torch.float32), y_estimate.to(torch.float32)
 
+    """
     def generate_adversarial_FGSM_vanilla(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, train = False):
         
         x_adv = torch.autograd.Variable(x.data, requires_grad=True)
@@ -828,6 +707,58 @@ class AdversarialGenerator(object):
             y_estimate_adversarial = self.model.model(x_adv)
 
         return x_adv, noise, y_estimate_adversarial, y_estimate
+    """
+    def generate_adversarial_FGSM_vanilla(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, train = False):
+        
+        z = torch.stft(x, 64, 32)
+        z_phase = torch.atan2(z[:,:,:,0], z[:,:,:,1])
+        z_spectrogram = z[:,:,:,0].pow(2) + z[:,:,:,1].pow(2)
+
+        z_spectrogram = z_spectrogram + torch.finfo(float).eps
+        PSD = 10 * torch.log10(z_spectrogram)
+        
+        max_save = torch.max(PSD,dim=1,keepdim=True)[0]
+        P = 96 + PSD - max_save
+
+        m = masking.get_mask_batch(signal.resample(x.numpy(), int(x.shape[1] * (44100/16000)), axis=1))
+        m_ = m[:,:int(np.ceil(m.shape[1]/2.75))]
+        m__ = signal.resample(m_, P.shape[1], axis=1)
+        mask = signal.resample(m__, P.shape[2], axis=2)
+
+        P_adv = torch.autograd.Variable(P.data, requires_grad=True)
+        # do all inverse transforms
+        PSD_adv = P_adv - 96 + max_save
+        z_spectrogram_adv = torch.sqrt(torch.pow(10, PSD/10))
+        import pdb; pdb.set_trace()
+        z_real = z_spectrogram_adv * torch.sin(z_phase)
+        z_imag = z_spectrogram_adv * torch.cos(z_phase)
+        z_adv = torch.stack([z_real, z_imag],dim=-1)
+        x_adv = torch.istft(z_adv, 64, 32)
+
+        y_estimate = self.model(x_adv)
+        if targeted:
+            loss = self.criterion(y_estimate,y) 
+        else: 
+            loss = - self.criterion(y_estimate,y)
+        
+        self.model.zero_grad() 
+        if x_adv.grad is not None:
+            x_adv.grad.data.fill_(0.0)
+        loss.backward() 
+
+        noise = mask * x_adv.grad.sign()
+        x_adv = x_adv - noise
+        x_adv = torch.clamp(x_adv,x_min,x_max)
+
+        if train:
+            return x_adv 
+
+        with torch.no_grad():
+            y_estimate_adversarial = self.model.model(x_adv)
+
+        return x_adv, noise, y_estimate_adversarial, y_estimate
+    
+
     
     def generate_adversarial_PGD(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.001, n_steps = 7, train = False):
 

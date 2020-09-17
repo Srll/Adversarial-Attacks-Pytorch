@@ -316,7 +316,7 @@ class audio_M5(nn.Module):
 
 
 class audio_F7(nn.Module):
-    # raw audio 11 conv layer deep classifier 
+    # raw audio 7 conv layer deep classifier 
     def __init__(self, classes, input_length):
         super(audio_F7, self).__init__()
         self.conv = nn.Conv1d(1, 32, 10, 1)
@@ -372,6 +372,7 @@ class audio_F7(nn.Module):
         x = torch.squeeze(x,1)
         
         return x
+
 
 class audio_F10(nn.Module):
     # raw audio 10 conv layer deep classifier 
@@ -445,8 +446,6 @@ class CNN(torch.nn.Module):
         if 'speech' in dataset_name:
             classes = 10
             input_length = 16000
-        
-
         elif dataset_name == 'dogscats':
             classes = 2 
         elif dataset_name == 'imagenet':
@@ -482,6 +481,10 @@ class CNN(torch.nn.Module):
             self.preprocess = preprocess.PreProcess(['cast_int16'])
             self.preprocess_bool = True
             self.model = audio_F7(classes, input_length)
+        elif self.network_type == 'audio_F7_base':
+            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess_bool = True
+            self.model = audio_F7(classes, input_length)
         elif self.network_type == 'audio_F10':
             self.preprocess = preprocess.PreProcess(['cast_int16'])
             self.preprocess_bool = True
@@ -494,23 +497,19 @@ class CNN(torch.nn.Module):
             self.preprocess = preprocess.PreProcess(['mfcc', 'insert_data_dim'])
             self.preprocess_bool = True
             self.model = audio_conv2d_mfcc(classes, input_length)
-        #elif self.network_type == 'audio_RNN':
-        #    input_length = int(input_length/128) # conversion due to MFCC transform
-        #    self.model = audio_RNN(257,classes,input_length)
+
         
 
     def GPU(self, enable):
         if enable:
             if torch.cuda.is_available():
                 self.GPU_enabled = True
-                #torch.backends.cudnn.benchmark = True
                 self.model.cuda()
                 return
             else:
                 print("No available CUDA device found, running on CPU instead")
-        else:
-            self.GPU_enabled = False
-            self.model.cpu()
+        self.GPU_enabled = False
+        self.model.cpu()
         
     def forward(self, x):
         if self.preprocess_bool == True:

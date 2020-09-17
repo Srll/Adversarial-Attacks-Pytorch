@@ -61,56 +61,79 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     accuracy_adversarial = 0
     loss = 0
     loss_adversarial = 0
-
-    for _, (inputs,labels) in enumerate(progressbar.progressbar(dataloader)):
+    
+    for i, (inputs,labels) in enumerate(progressbar.progressbar(dataloader)):
         inputs = inputs.type(torch.FloatTensor)
         labels = labels.type(torch.LongTensor)
         if targeted:
             target = torch.LongTensor((torch.ones_like(labels) * target_id))
             inputs_adversarial, adversarial_noise, labels_estimations_adversarial, labels_estimations = \
-                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs, target, targeted = targeted, eps=args.epsilon)
+                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs[~target.eq(labels)], target[~target.eq(labels)], targeted = targeted, eps=args.epsilon)
         else:
             inputs_adversarial, adversarial_noise, labels_estimations_adversarial, labels_estimations = \
                 adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs, labels, targeted = targeted, eps=args.epsilon)
-        loss += criterion(labels_estimations, labels)
-        loss_adversarial += criterion(labels_estimations_adversarial, labels)
-        accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
-        accuracy_adversarial += torch.mean(labels.eq(torch.max(labels_estimations_adversarial ,dim=1)[1]).float())
+        
+        if targeted:
+            loss += criterion(labels_estimations, labels[~target.eq(labels)])
+            loss_adversarial += criterion(labels_estimations_adversarial, labels[~target.eq(labels)])
+            accuracy += torch.mean(labels[~target.eq(labels)].eq(torch.max(labels_estimations,dim=1)[1]).float())
+            accuracy_adversarial += torch.mean((torch.zeros_like(labels[~target.eq(labels)]) + target_id).eq(torch.max(labels_estimations_adversarial ,dim=1)[1]).float())
+            
+            predictions = np.hstack((np.expand_dims(labels[~target.eq(labels)],-1), np.ones((labels[~target.eq(labels)].shape[0],1))*target_id, labels_estimations.detach().numpy(), labels_estimations_adversarial.detach().numpy()))
+            print('save to csv')
+            with open(os.path.join(figures_path_extended,'predictions.csv'),'ab') as f:
+                np.savetxt(f, predictions, delimiter=",")
+                        
+        else:
+            loss += criterion(labels_estimations, labels)
+            loss_adversarial += criterion(labels_estimations_adversarial, labels)
+            accuracy += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
+            accuracy_adversarial += torch.mean(labels.eq(torch.max(labels_estimations_adversarial ,dim=1)[1]).float())
+            
+            predictions = np.hstack((np.expand_dims(labels,-1), np.ones((labels.shape[0],1))*target_id, labels_estimations.detach().numpy(), labels_estimations_adversarial.detach().numpy()))
+            print('save to csv')
+            with open(os.path.join(figures_path_extended,'predictions.csv'),'ab') as f:
+                np.savetxt(f, predictions, delimiter=",")
 
-        print('save to csv')
-        predictions = np.hstack((np.expand_dims(labels,-1), np.ones((labels.shape[0],1))*target_id, labels_estimations.detach().numpy(), labels_estimations_adversarial.detach().numpy()))
-        with open(os.path.join(figures_path_extended,'predictions.csv'),'ab') as f:
-            np.savetxt(f, predictions, delimiter=",")
+        if i >= int(args.n_samples_adv/args.batch_size) - 1:
+            break
+        
+            
+        
+        
+        
+        
         
 
     target_name = None
     if targeted:
         target_name = labels_name[target_id]
     
-    # TODO fix
-    input_type = 'audio'
-        #inputs
-        #save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
-        #    path=figures_path, target_name=target_name)
     
-
-    loss /= len(dataloader)
-    loss_adversarial /= len(dataloader)
-    accuracy /= len(dataloader)
-    accuracy_adversarial /= len(dataloader)
-
+    input_type = 'audio'
+    
+    loss /= min(int(args.n_samples_adv/args.batch_size), len(dataloader))
+    loss_adversarial /= min(int(args.n_samples_adv/args.batch_size), len(dataloader))
+    accuracy /= min(int(args.n_samples_adv/args.batch_size), len(dataloader))
+    accuracy_adversarial /= min(int(args.n_samples_adv/args.batch_size), len(dataloader))
+    
     if targeted:
         print('Targeted attack: {target_name}')
     else: 
         print('Untargeted attack:')
 
-    print(f'Cross-Entropy Loss: {loss:.2f}')
-    print(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.2f}')
-    print(f'Accuracy: {accuracy:.2f}')
-    print(f'Accuracy (adversarial): {accuracy_adversarial:.2f}')
+    if targeted:
+        print(f'Cross-Entropy Loss (targeted): {loss:.2f}')
+        print(f'Cross-Entropy Loss (targeted adversarial): {loss_adversarial:.2f}')
+        print(f'Accuracy (targeted): {accuracy:.2f}')
+        print(f'Accuracy (targeted adversarial): {accuracy_adversarial:.2f}')
     
-    # saving to folder 
-
+    else:
+        print(f'Cross-Entropy Loss: {loss:.2f}')
+        print(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.2f}')        
+        print(f'Accuracy: {accuracy:.2f}')
+        print(f'Accuracy (adversarial): {accuracy_adversarial:.2f}')
+    
 
 
     
@@ -121,8 +144,14 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         f.write('Untargeted attack:')
     f.write(f'Cross-Entropy Loss: {loss:.2f} \n')
     f.write(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.2f} \n')
+    if targeted:
+        f.write(f'Cross-Entropy Loss (targeted adversarial): {loss_adversarial:.2f} \n')
+        f.write(f'Cross-Entropy Loss (targeted clean): {loss:.2f} \n')
     f.write(f'Accuracy: {accuracy:.2f}\n')
     f.write(f'Accuracy (adversarial): {accuracy_adversarial:.2f} \n')
+    if targeted:
+        f.write(f'Accuracy (targeted adversarial): {accuracy_adversarial:.2f} \n')
+        f.write(f'Accuracy (targeted clean): {accuracy:.2f} \n')
     f.close()
 
     if input_type == 'images':
@@ -231,10 +260,9 @@ def evaluate():
     else: # use same model for generating adversaries and evaluating
         adversary_model = model
     
-    dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
-    dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
-    dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
+    dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False, evaluation=True)
     dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
+    
     labels_name = dataset_eval.labels_name
     
     # obtain the criterion used for training 
@@ -276,9 +304,12 @@ def evaluate():
     
     # evaluate the model 
     input_type = args.model_name.split('_')[0]
-    
-    #evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, input_type=input_type)
-    evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, target_id=args.target, input_type=input_type)
+
+
+    if args.targeted:
+        evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=True, input_type=input_type)
+    else:
+        evaluate_model(model, adversary, dataloader_eval, labels_name, targeted=False, target_id=args.target, input_type=input_type)
 
 if __name__ == "__main__":
     evaluate()

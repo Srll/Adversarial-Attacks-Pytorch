@@ -18,14 +18,14 @@ def train():
 
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name
-    models_path = args.models_dir + args.dataset_name 
+    models_path = args.models_dir + args.dataset_name
     
     model = networks.CNN(args.model_name,dataset_name=args.dataset_name)
     model.GPU(args.gpu)
     dataset_train = utils.get_dataset(args.dataset_name, dataset_path)
     dataloader_train = torch.utils.data.DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
-    dataset_eval = utils.get_dataset(args.dataset_name, dataset_path, train=False)
-    dataloader_eval = torch.utils.data.DataLoader(dataset_eval, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
+    dataset_validation = utils.get_dataset(args.dataset_name, dataset_path, train=False, evaluation=False)
+    dataloader_validation = torch.utils.data.DataLoader(dataset_validation, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
 
     # prepare the optimization  
     criterion = torch.nn.CrossEntropyLoss()
@@ -41,7 +41,7 @@ def train():
         optimizer = torch.optim.Adam(params_to_update, lr=0.01)
 
     # prepare the losses and iterations
-    n_iterations = args.n_iterations 
+    n_iterations = args.n_iterations
     n_iterations_show = args.verbose_rate
     running_loss = 0
     running_accuracy = 0
@@ -61,6 +61,8 @@ def train():
     else: 
         print(f'Starting the model at iteration {iteration + 1}')
 
+
+    
     # prepare adversary
     adversary = adversaries.AdversarialGenerator(model,criterion) 
     
@@ -100,44 +102,42 @@ def train():
                 bar.update(iteration % n_iterations_show)
                 #bar.update(int(100 * i / n_iterations_show))
                 if iteration % n_iterations_show == n_iterations_show-1:        
-                    loss_eval = 0.0
-                    accuracy_eval = 0.0
+                    loss_validation = 0.0
+                    accuracy_validation = 0.0
                     print('\nEvaluating...')
-                    for _, (inputs,labels) in enumerate(progressbar.progressbar(dataloader_eval)):
+                    for _, (inputs,labels) in enumerate(progressbar.progressbar(dataloader_validation)):
                             inputs = inputs.type(torch.FloatTensor)
                             labels = labels.type(torch.LongTensor)
                             labels_estimations = model(inputs)
-                            loss_eval += criterion(labels_estimations, labels)
-                            accuracy_eval += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
+                            loss_validation += criterion(labels_estimations, labels)
+                            accuracy_validation += torch.mean(labels.eq(torch.max(labels_estimations,dim=1)[1]).float())
                     
-                    print(f'Loss at iteration {iteration+1} -> train: {running_loss/n_iterations_show:.3f} | eval: {loss_eval/len(dataloader_eval):.3f}')
-                    print(f'Accuracy at iteration {iteration+1} -> train: {running_accuracy/n_iterations_show:.3f} | eval: {accuracy_eval/len(dataloader_eval):.3f}')
+                    print(f'Loss at iteration {iteration+1} -> train: {running_loss/n_iterations_show:.3f} | eval: {loss_validation/len(dataloader_validation):.3f}')
+                    print(f'Accuracy at iteration {iteration+1} -> train: {running_accuracy/n_iterations_show:.3f} | eval: {accuracy_validation/len(dataloader_validation):.3f}')
 
                     torch.save({
                         'iteration': iteration,
                         'model_state_dict': model.state_dict(), 
                         'optimizer_state_dict': optimizer.state_dict(),
                         'training_loss': running_loss/n_iterations_show,
-                        'evaluation_loss': loss_eval/len(dataloader_eval), 
+                        'evaluation_loss': loss_validation/len(dataloader_validation), 
                         'training_accuracy': running_accuracy/n_iterations_show,
-                        'evaluation_accuracy': accuracy_eval/len(dataloader_eval)
+                        'evaluation_accuracy': accuracy_validation/len(dataloader_validation)
                         }, checkpoint_path)
 
                     
                     running_loss = 0.0
                     running_accuracy = 0.0
-                    if (accuracy_eval/len(dataloader_eval)).item() < min(accuracy_history):
+                    if (accuracy_validation/len(dataloader_validation)).item() < min(accuracy_history):
                         iteration = n_iterations
-                    accuracy_history.append((accuracy_eval/len(dataloader_eval)).item())
+                    accuracy_history.append((accuracy_validation/len(dataloader_validation)).item())
                     accuracy_history.pop(0)
                     
                     print(accuracy_history)
                     print(max(accuracy_history))
-            
             model.train()
             iteration += 1
             
 
-# To make multiprocessing work on windows
 if __name__ == '__main__':
     train()
