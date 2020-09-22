@@ -82,8 +82,7 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
             predictions = np.hstack((np.expand_dims(labels[~target.eq(labels)],-1), np.ones((labels[~target.eq(labels)].shape[0],1))*target_id, labels_estimations.detach().numpy(), labels_estimations_adversarial.detach().numpy()))
             print('save to csv')
             with open(os.path.join(figures_path_extended,'predictions.csv'),'ab') as f:
-                np.savetxt(f, predictions, delimiter=",")
-                        
+                np.savetxt(f, predictions, delimiter=",")           
         else:
             loss += criterion(labels_estimations, labels)
             loss_adversarial += criterion(labels_estimations_adversarial, labels)
@@ -123,16 +122,16 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         print('Untargeted attack:')
 
     if targeted:
-        print(f'Cross-Entropy Loss (targeted): {loss:.2f}')
-        print(f'Cross-Entropy Loss (targeted adversarial): {loss_adversarial:.2f}')
-        print(f'Accuracy (targeted): {accuracy:.2f}')
-        print(f'Accuracy (targeted adversarial): {accuracy_adversarial:.2f}')
+        print(f'Cross-Entropy Loss (targeted): {loss:.3f}')
+        print(f'Cross-Entropy Loss (targeted adversarial): {loss_adversarial:.3f}')
+        print(f'Accuracy (targeted): {accuracy:.3f}')
+        print(f'Accuracy (targeted adversarial): {accuracy_adversarial:.3f}')
     
     else:
-        print(f'Cross-Entropy Loss: {loss:.2f}')
-        print(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.2f}')        
-        print(f'Accuracy: {accuracy:.2f}')
-        print(f'Accuracy (adversarial): {accuracy_adversarial:.2f}')
+        print(f'Cross-Entropy Loss: {loss:.3f}')
+        print(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.3f}')        
+        print(f'Accuracy: {accuracy:.3f}')
+        print(f'Accuracy (adversarial): {accuracy_adversarial:.3f}')
     
 
 
@@ -140,26 +139,27 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
     f = open(figures_path_extended + '\\' + "results.txt", "a")
     if targeted:
         f.write('Targeted attack: {target_name}')
+        f.write(f'Cross-Entropy Loss (targeted adversarial): {loss_adversarial:.3f} \n')
+        f.write(f'Cross-Entropy Loss (targeted clean): {loss:.3f} \n')
+        f.write(f'Accuracy (targeted adversarial): {accuracy_adversarial:.3f} \n')
+        f.write(f'Accuracy (targeted clean): {accuracy:.3f} \n')
+    
     else:
         f.write('Untargeted attack:')
-    f.write(f'Cross-Entropy Loss: {loss:.2f} \n')
-    f.write(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.2f} \n')
-    if targeted:
-        f.write(f'Cross-Entropy Loss (targeted adversarial): {loss_adversarial:.2f} \n')
-        f.write(f'Cross-Entropy Loss (targeted clean): {loss:.2f} \n')
-    f.write(f'Accuracy: {accuracy:.2f}\n')
-    f.write(f'Accuracy (adversarial): {accuracy_adversarial:.2f} \n')
-    if targeted:
-        f.write(f'Accuracy (targeted adversarial): {accuracy_adversarial:.2f} \n')
-        f.write(f'Accuracy (targeted clean): {accuracy:.2f} \n')
+        f.write(f'Cross-Entropy Loss: {loss:.3f} \n')
+        f.write(f'Cross-Entropy Loss (adversarial): {loss_adversarial:.3f} \n')
+        f.write(f'Accuracy: {accuracy:.3f}\n')
+        f.write(f'Accuracy (adversarial): {accuracy_adversarial:.3f} \n')
     f.close()
 
     if input_type == 'images':
         save_images(inputs, adversarial_noise, inputs_adversarial, labels, labels_estimations, labels_estimations_adversarial, 
             path=figures_path, target_name=target_name)
     elif input_type == 'audio':
-        save_audio(inputs.detach(), adversarial_noise.detach(), inputs_adversarial.detach(), labels.detach(), labels_estimations.detach(), labels_estimations_adversarial.detach(), path=figures_path_extended, target_name=target_name)
-    
+        if targeted:
+            save_audio(inputs[~target.eq(labels)].detach(), adversarial_noise.detach(), inputs_adversarial.detach(), labels.detach(), labels_estimations.detach(), labels_estimations_adversarial.detach(), path=figures_path_extended, target_name=target_name)
+        else:
+            save_audio(inputs.detach(), adversarial_noise.detach(), inputs_adversarial.detach(), labels.detach(), labels_estimations.detach(), labels_estimations_adversarial.detach(), path=figures_path_extended, target_name=target_name)
     
 def save_images(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None):
     def paint_images(im, correct):

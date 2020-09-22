@@ -221,7 +221,7 @@ class SpeechCommandDataset(torch.utils.data.Dataset):
         
         return audio, label
 
-class SpeechCommandDataset_eval_RGAP_32_targeted(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_RG_32_targeted(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -248,7 +248,8 @@ class SpeechCommandDataset_eval_RGAP_32_targeted(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
-class SpeechCommandDataset_eval_RGAP_32_untargeted(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_RG_64_targeted(torch.utils.data.Dataset):
+
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
         create_speech_commands_dataset_atlas_eval(directory)
@@ -274,7 +275,60 @@ class SpeechCommandDataset_eval_RGAP_32_untargeted(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
-class SpeechCommandDataset_eval_LGAP_32_targeted(torch.utils.data.Dataset):
+
+class SpeechCommandDataset_eval_RG_32_untargeted(torch.utils.data.Dataset):
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_RG_64_untargeted(torch.utils.data.Dataset):
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+
+        label = self.labels[idx]
+        
+        return audio, label
+class SpeechCommandDataset_eval_LG_32_targeted(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -302,7 +356,36 @@ class SpeechCommandDataset_eval_LGAP_32_targeted(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
-class SpeechCommandDataset_eval_LGAP_32_untargeted(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_LG_64_targeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+        
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+
+        label = self.labels[idx]
+        
+        return audio, label
+
+class SpeechCommandDataset_eval_LG_32_untargeted(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
         
@@ -332,7 +415,37 @@ class SpeechCommandDataset_eval_LGAP_32_untargeted(torch.utils.data.Dataset):
         label = self.labels[idx]
         return audio, label
 
-class SpeechCommandDataset_eval_RGAP_targeted_clean(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_LG_64_untargeted(torch.utils.data.Dataset):
+
+    def __init__(self, directory, input_size, train=True, transform=None, force=False):
+        
+        create_speech_commands_dataset_atlas_eval(directory)
+        with open(os.path.join(directory,'audio_atlas.pkl'), 'rb') as file:
+            self.audio_paths = pickle.load(file)['train'] if train else pickle.load(file)['validation']
+        with open(os.path.join(directory,'name_to_label.pkl'), 'rb') as file:
+            name_to_label = pickle.load(file)
+
+        self.labels = [name_to_label[v.split(os.sep)[-2]] for v in self.audio_paths]
+        
+        self.labels_name = ['yes', 'no', 'up', 'down', 'left', 'right', 'on', 'off', 'stop', 'go']
+        self.input_size = input_size
+
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        audio_path = self.audio_paths[idx]
+        fs, audio = wavread(audio_path)
+
+        audio = audio.astype(np.float32)
+        audio = audio*1
+        audio = audio_utils.zeropad(audio, 16128) # 1 seconds
+        #audio = audio_utils.resample_to_44100(audio, fs)
+
+        label = self.labels[idx]
+        return audio, label
+
+class SpeechCommandDataset_eval_RG_targeted_clean(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -360,7 +473,7 @@ class SpeechCommandDataset_eval_RGAP_targeted_clean(torch.utils.data.Dataset):
 
         label = self.labels[idx]
         return audio, label
-class SpeechCommandDataset_eval_LGAP_untargeted_clean(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_LG_untargeted_clean(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -389,7 +502,7 @@ class SpeechCommandDataset_eval_LGAP_untargeted_clean(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
-class SpeechCommandDataset_eval_LGAP_targeted_clean(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_LG_targeted_clean(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -420,7 +533,7 @@ class SpeechCommandDataset_eval_LGAP_targeted_clean(torch.utils.data.Dataset):
         label = self.labels[idx]
         
         return audio, label
-class SpeechCommandDataset_eval_RGAP_untargeted_clean(torch.utils.data.Dataset):
+class SpeechCommandDataset_eval_RG_untargeted_clean(torch.utils.data.Dataset):
 
     def __init__(self, directory, input_size, train=True, transform=None, force=False):
 
@@ -544,22 +657,30 @@ def get_dataset(dataset_name, dataset_path, input_size = 28, train = True, evalu
 
     if dataset_name == 'speech':
         return SpeechCommandDataset(dataset_path, input_size, train, evaluation=evaluation)
-    elif dataset_name == 'speech_eval_LGAP_untargeted':
-        return SpeechCommandDataset_eval_LGAP_32_untargeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RGAP_untargeted':
-        return SpeechCommandDataset_eval_RGAP_32_untargeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_LGAP_targeted':
-        return SpeechCommandDataset_eval_RGAP_32_targeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RGAP_targeted':
-        return SpeechCommandDataset_eval_RGAP_32_targeted(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_LGAP_untargeted_clean':
-        return SpeechCommandDataset_eval_LGAP_untargeted_clean(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RGAP_untargeted_clean':
-        return SpeechCommandDataset_eval_LGAP_untargeted_clean(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_LGAP_targeted_clean':
-        return SpeechCommandDataset_eval_LGAP_targeted_clean(dataset_path, input_size, train)
-    elif dataset_name == 'speech_eval_RGAP_targeted_clean':
-        return SpeechCommandDataset_eval_RGAP_targeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_untargeted_32':
+        return SpeechCommandDataset_eval_LG_32_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_untargeted_64':
+        return SpeechCommandDataset_eval_LG_64_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_untargeted_32':
+        return SpeechCommandDataset_eval_RG_32_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_untargeted_64':
+        return SpeechCommandDataset_eval_RG_64_untargeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_targeted_32':
+        return SpeechCommandDataset_eval_LG_32_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_targeted_64':
+        return SpeechCommandDataset_eval_LG_64_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_targeted_32':
+        return SpeechCommandDataset_eval_RG_32_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_targeted_64':
+        return SpeechCommandDataset_eval_RG_64_targeted(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_untargeted_clean':
+        return SpeechCommandDataset_eval_LG_untargeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_untargeted_clean':
+        return SpeechCommandDataset_eval_RG_untargeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_LG_targeted_clean':
+        return SpeechCommandDataset_eval_LG_targeted_clean(dataset_path, input_size, train)
+    elif dataset_name == 'speech_eval_RG_targeted_clean':
+        return SpeechCommandDataset_eval_RG_targeted_clean(dataset_path, input_size, train)
     elif dataset_name == 'dogscats':
         return DogsCatsDataset(dataset_path, input_size, train)
     elif dataset_name == 'imagenet':
@@ -660,7 +781,7 @@ def get_args_evaluate():
         help = 'folder to store the models') 
     parser.add_argument('--datasets_dir', default = '..'+os.sep+'Datasets'+os.sep,
         help = 'folder where the datasets are stored') 
-    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','speech_eval_RG_targeted','speech_eval_RG_untargeted','speech_eval_LG_targeted','speech_eval_LG_untargeted','speech_eval_RG_targeted_clean','speech_eval_RG_untargeted_clean','speech_eval_LG_targeted_clean','speech_eval_LG_untargeted_clean','mnist','FMA_small'], default = 'imagenet', 
+    parser.add_argument('--dataset_name', choices = ['dogscats', 'imagenet','speech','speech_eval_RG_targeted_32','speech_eval_RG_untargeted_32','speech_eval_RG_targeted_64','speech_eval_RG_untargeted_64','speech_eval_LG_targeted_32','speech_eval_LG_untargeted_32','speech_eval_LG_targeted_64','speech_eval_LG_untargeted_64','speech_eval_RG_targeted_clean','speech_eval_RG_untargeted_clean','speech_eval_LG_targeted_clean','speech_eval_LG_untargeted_clean','mnist','FMA_small'], default = 'imagenet', 
         help = 'dataset where to run the experiments') 
     parser.add_argument('--model_name', choices = [
             'images_shufflenetv2', 'images_mobilenetv2', 'images_resnet18', 'audio_conv_raw', 'simple_dense', 'audio_M3','audio_M5','audio_MJ','audio_F7','audio_F7_base','audio_F10', 'audio_conv2d_mfcc', 'audio_conv2d_spectrogram'

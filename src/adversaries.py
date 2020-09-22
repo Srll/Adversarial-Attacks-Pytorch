@@ -116,18 +116,15 @@ class AdversarialGenerator(object):
         if QUICK:
             N_PERTURBATIONS = int(np.prod(MAX_POS[1] * (F_MAX-F_MIN))*2 / 1000)
         else:
-            N_PERTURBATIONS = int(np.prod(MAX_POS[1] * (F_MAX-F_MIN)))
+            #N_PERTURBATIONS = int(np.prod(MAX_POS[1] * (F_MAX-F_MIN)))
             N_PERTURBATIONS = 20001
+            
 
 
         z_1d_original = np.reshape(z_2d, (N_BATCH,1,np.prod(MAX_POS)))
         z_1d_adv = np.copy(z_1d_original)
         
         print("Calculating masking threshold")
-
-        m_original = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
-        m_32 = np.zeros((m_original.shape[0],m_original.shape[1]+1,m_original.shape[2]))
-        m_32[:,:-1,:] = m_original.copy()
         m_32 = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
 
         COLOR_LIST = ['salmon','olive','darkgreen','khaki','black','grey','orange','maroon','sandybrown','lightblue','purple','pink','yellow','royalblue','tan','cyan','blue','red','violet','silver','gold']    
@@ -246,7 +243,6 @@ class AdversarialGenerator(object):
         return x_adv.to(torch.float32), noise.to(torch.float32), y_estimate_adversarial.to(torch.float32), y_estimate.to(torch.float32)
 
 
-    
     def generate_adversarial_GL_batch(self,x, y, targeted=False, eps=1,x_min=0,x_max=1,train=False,N_pixels=1000, N_loops=20, mask=True, intitalization_max=False):
         FS_MODEL = 16000
         FS_Z = 44100
@@ -272,10 +268,7 @@ class AdversarialGenerator(object):
         
 
 
-        m_original = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
-        m = np.zeros((m_original.shape[0],m_original.shape[1]+1,m_original.shape[2]))
-        m[:,:-1,:] = m_original
-        
+        m = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
         
         #m_2d_mag = db2mag(m)
         m_2d = signal.resample(m, F_RESOLUTION, axis=1)
