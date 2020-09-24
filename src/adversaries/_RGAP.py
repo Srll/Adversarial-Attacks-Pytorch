@@ -1,14 +1,15 @@
 from inaudible import preprocess, masking
 import torch
 import numpy as np
-import progressbar
 from matplotlib import pyplot as plt
-import time
 from scipy import signal
 import pickle
 import os.path
 
-def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,train=False, verbose=False):
+def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, verbose=False,adv_parameters=[20001]):
+    # adv_parameters = [N_iterations]
+    import pdb; pdb.set_trace()
+    N_iterations = int(adv_parameters[0])
     def mag2db(xi):
         if np.isscalar(xi):
             if xi == 0:
@@ -29,8 +30,7 @@ def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,
     EARLY_STOP = True
     FS_MODEL = 16000
     FS_Z = 44100
-    np.set_printoptions(15)
-    torch.set_printoptions(precision=20)
+    
 
     F_RESOLUTION = int(self.adversarial_preprocess.stft_n_fft/2) + 1
     F_MIN = 0 #int(np.floor(500 / (FS_Z/2) * F_RESOLUTION))              # limit lowest frequency perturbation to 500 hz
@@ -45,7 +45,7 @@ def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,
     MAX_POS = z_2d.shape[2:]
 
     accuracy = np.zeros((N_BATCH, 0))
-    N_PERTURBATIONS = 20001
+    
 
     z_1d_original = np.reshape(z_2d, (N_BATCH,1,np.prod(MAX_POS)))
     z_1d_adv = np.copy(z_1d_original)
@@ -67,13 +67,13 @@ def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,
         pred_best = np.array(np.diag(torch.nn.functional.softmax(self.model(x), dim=1).numpy()[:,y]))
 
     if verbose:
-        plt.axis([0, N_PERTURBATIONS, 0, 1])
+        plt.axis([0, N_iterations, 0, 1])
         plt.ion()
     
     available_idx = np.tile(np.arange(F_MIN, F_MAX) * F_RESOLUTION, (MAX_POS[1],1)).T + np.arange(MAX_POS[1])
     unperturbed_idx_list = np.reshape(available_idx, MAX_POS[1]*(F_MAX-F_MIN)).astype(dtype=np.int16)
     
-    perturb_idx = np.array([np.random.choice(unperturbed_idx_list, N_PERTURBATIONS, replace=True) for i in range(N_BATCH)])
+    perturb_idx = np.array([np.random.choice(unperturbed_idx_list, N_iterations, replace=True) for i in range(N_BATCH)])
     active = np.arange(0,N_BATCH)
     
     if os.path.isfile(os.path.join('save','RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted)+'_n'+'.pickle')):
@@ -83,7 +83,7 @@ def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,
     if os.path.isfile(os.path.join('save','RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted)+'_z_1d_adv'+'.pickle')):
         z_1d_adv = pickle.load(open(os.path.join('save','RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted)+'_z_1d_adv'+'.pickle'),'rb') )
 
-    for n in range(n_start, N_PERTURBATIONS):
+    for n in range(n_start, N_iterations):
         if (n % 1000) == 0: # save state
             pickle.dump(n,open(os.path.join('save','RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted)+'_n'+'.pickle'),'wb'))
             pickle.dump(z_1d_adv,open(os.path.join('save','RG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted)+'_z_1d_adv'+'.pickle'),'wb'))
@@ -128,10 +128,11 @@ def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,
         
         if verbose:
             if n % 1000 == 0:
-                print("-----------------")
+                
                 accuracy = np.hstack((accuracy, np.expand_dims(pred_best, -1)))
                 
-            if n % int(N_PERTURBATIONS/20) == 0:
+            if n % int(N_iterations/20) == 0:
+                print("-----------------")
                 print(pred_best[active])
                 print(pred_try)
                 if PLOT:
@@ -151,9 +152,6 @@ def generate_adversarial_RGAP(self,x, y, targeted=False, eps=1, x_min=0,x_max=1,
     self.adversarial_preprocess.forward(x_original) # recalculate phase information
     x_adv = self.adversarial_preprocess.inverse(z_257).detach()
     
-    if train:
-        self.model.train()
-        return x_adv
 
     with torch.no_grad(): 
         y_estimate_adversarial = torch.nn.functional.softmax(self.model(x_adv),dim=1)

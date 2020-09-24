@@ -1,14 +1,17 @@
+from inaudible import preprocess, masking
 import torch
 import numpy as np
-import progressbar
 from matplotlib import pyplot as plt
-import time
 from scipy import signal
 import pickle
 import os.path
 
-def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1,x_min=0,x_max=1,train=False,N_pixels=2000, N_loops=40, mask=True, intitalization_max=False, verbose=False):
-            
+def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1, verbose=False, adv_parameters=[20,1000]):
+    # adv_parameters = [N_iterations, N_perturbations]
+
+    N_loops = adv_parameters[0]
+    N_pixels = adv_parameters[1]
+
     def mag2db(xi):
         if np.isscalar(xi):
             if xi == 0:

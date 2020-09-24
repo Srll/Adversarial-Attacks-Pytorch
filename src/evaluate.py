@@ -68,10 +68,10 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         if targeted:
             target = torch.LongTensor((torch.ones_like(labels) * target_id))
             inputs_adversarial, adversarial_noise, labels_estimations_adversarial, labels_estimations = \
-                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs[~target.eq(labels)], target[~target.eq(labels)], targeted = targeted, eps=args.epsilon, verbose=args.adv_verbose)
+                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs[~target.eq(labels)], target[~target.eq(labels)], targeted = targeted, eps=args.epsilon, verbose=args.adv_verbose, adv_parameters=args.adv_parameters)
         else:
             inputs_adversarial, adversarial_noise, labels_estimations_adversarial, labels_estimations = \
-                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs, labels, targeted = targeted, eps=args.epsilon)
+                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs, labels, targeted = targeted, eps=args.epsilon, verbose=args.adv_verbose, adv_parameters=args.adv_parameters)
         
         if targeted:
             loss += criterion(labels_estimations, labels[~target.eq(labels)])

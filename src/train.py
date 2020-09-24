@@ -3,7 +3,7 @@ import utils
 import matplotlib.pyplot as plt 
 import networks
 import progressbar
-import adversaries
+from adversaries import AdversarialGenerator
 import os
 import preprocess
 

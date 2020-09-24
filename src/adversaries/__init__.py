@@ -1,6 +1,6 @@
+from inaudible import preprocess, masking
 import torch
 import numpy as np
-from inaudible import preprocess, masking
 import progressbar
 from matplotlib import pyplot as plt
 import time
@@ -17,7 +17,7 @@ class AdversarialGenerator(object):
         self.criterion = criterion 
         
     
-    def generate_adversarial(self, adversarial_type, x, target, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.03, n_steps = 7, train = False, target_id=3, verbose=False):
+    def generate_adversarial(self, adversarial_type, x, target, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.03, n_steps = 7, train = False, target_id=3, verbose=False, adv_parameters=[None]):
         if train:    
             if adversarial_type == 'none':
                 return x
@@ -31,8 +31,7 @@ class AdversarialGenerator(object):
                 self.adversarial_preprocess = preprocess.PreProcess('none')
                 x_adv = self.generate_adversarial_ONE_PIXEL(x, target, targeted, x_min, x_max, train)
             elif adversarial_type == 'DE':
-                self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram', 'insert_data_dim', 'mag2db96'])
-                x_adv = self.generate_adversarial_DE(x, target, targeted, x_min, x_max, train)
+                print('DE is not supported for adversarial training')
             elif adversarial_type == 'DE_MASKING':
                 print('DE_MASKING is not supported for adversarial training')
             elif adversarial_type == 'LGAP':
@@ -66,10 +65,10 @@ class AdversarialGenerator(object):
                 x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_GL_batch(x, target, targeted,eps, 0, 0, train=train, mask=False)
             elif adversarial_type == 'LGAP':
                 self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram','insert_data_dim','mag2db96'])
-                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_LGAP(x, target, targeted,eps, 0,0,train=train, mask=True,verbose=verbose)
+                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_LGAP(x, target, targeted,eps,verbose=verbose,adv_parameters=adv_parameters)
             elif adversarial_type == 'RGAP':
                 self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram', 'insert_data_dim', 'mag2db96'])
-                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_RGAP(x, target, targeted, eps, 20, train=train,verbose=verbose)
+                x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_RGAP(x, target, targeted, eps, verbose=verbose, adv_parameters=adv_parameters)
             elif adversarial_type == 'brute_force_mask_reduce':
                 self.adversarial_preprocess = preprocess.PreProcess(['resample_to_44100','spectrogram','insert_data_dim','mag2db96'])
                 x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_brute_force_reduce(x, target, targeted, 10, 20, train=train)
