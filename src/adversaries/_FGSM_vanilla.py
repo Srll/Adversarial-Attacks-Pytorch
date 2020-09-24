@@ -1,7 +1,4 @@
 import torch
-import numpy as np
-import progressbar
-import time
 
 def generate_adversarial_FGSM_vanilla(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, train = False):
         

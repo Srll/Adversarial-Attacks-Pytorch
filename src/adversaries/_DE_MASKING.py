@@ -15,9 +15,12 @@ def generate_adversarial_DE_MASKING(self, x, y, targeted=False, x_min=0, x_max=1
     
     x_np = x.numpy()
     if mask == True:
-        m = masking.get_mask_batches(x_old.numpy(), x_np, 16000, x_np.shape[2])
-    else:
-        m = np.ones_like(x_np) * 96
+        m_32 = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
+        
+    m_2d = signal.resample(m_32,MAX_POS[1],axis=-1)     # resample to same time resolution
+    m_2d = signal.resample(m_2d,F_RESOLUTION,axis=1)    # resample to same frequency resolution
+    m_2d[m_2d > 96] = 96
+    m_2d_mag = db2mag(m_2d)
 
     def evolve(p_pos, p_val, F=0.5):
         #p_pos = [B, N, K, 3]

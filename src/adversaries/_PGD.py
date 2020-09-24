@@ -1,3 +1,4 @@
+import torch
 def generate_adversarial_PGD(self, x, y, targeted=False, eps = 0.03, x_min = 0.0, x_max = 1.0, alpha = 0.001, n_steps = 7, train = False):
 
     delta = torch.rand_like(x) * (2.0 * eps) - eps # could also be initialized to 0
