@@ -9,9 +9,9 @@ import os.path
 def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1, verbose=False, adv_parameters=[20,1000]):
     # adv_parameters = [N_iterations, N_perturbations]
 
-    N_loops = adv_parameters[0]
-    N_pixels = adv_parameters[1]
-
+    N_loops = int(adv_parameters[0])
+    N_pixels = int(adv_parameters[1])
+    
     def mag2db(xi):
         if np.isscalar(xi):
             if xi == 0:
@@ -52,7 +52,6 @@ def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1, verbose=False, a
 
     m = masking.get_mask_batch(signal.resample(x_original.numpy(), int(x.shape[1] * (FS_Z/FS_MODEL)), axis=1))
     
-    #m_2d_mag = db2mag(m)
     m_2d = signal.resample(m, F_RESOLUTION, axis=1)
     m_2d = signal.resample(m_2d, T_RESOLUTION, axis=2)
     m_2d_mag = db2mag(m_2d)
@@ -198,9 +197,6 @@ def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1, verbose=False, a
     self.adversarial_preprocess.forward(x)
     x_adv = self.adversarial_preprocess.inverse(z_adv).detach()
     
-    if train:
-        self.model.train()
-        return x_adv
 
     with torch.no_grad(): 
         y_estimate_adversarial = torch.nn.functional.softmax(self.model(x_adv),dim=1) # DO THIS OUTSIDE OF THIS FUNCTION?
