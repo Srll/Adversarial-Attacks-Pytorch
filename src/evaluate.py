@@ -4,11 +4,11 @@ import utils
 import matplotlib.pyplot as plt 
 import networks
 import progressbar
-import adversaries
+from adversaries import AdversarialGenerator
 import os
 import scipy
 import scipy.misc
-import preprocess
+from inaudible import preprocess
 import numpy as np
 from PIL import Image
 
@@ -68,7 +68,7 @@ def evaluate_model(model, adversary, dataloader, labels_name, targeted=False, ta
         if targeted:
             target = torch.LongTensor((torch.ones_like(labels) * target_id))
             inputs_adversarial, adversarial_noise, labels_estimations_adversarial, labels_estimations = \
-                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs[~target.eq(labels)], target[~target.eq(labels)], targeted = targeted, eps=args.epsilon)
+                adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs[~target.eq(labels)], target[~target.eq(labels)], targeted = targeted, eps=args.epsilon, verbose=args.adv_verbose)
         else:
             inputs_adversarial, adversarial_noise, labels_estimations_adversarial, labels_estimations = \
                 adversary.generate_adversarial(args.adversarial_attack_algorithm, inputs, labels, targeted = targeted, eps=args.epsilon)
@@ -275,8 +275,6 @@ def evaluate():
     # load the checkpoint, if any
     checkpoint_path = os.path.join(models_path, args.model_name + '_' + args.adversarial_training_algorithm + '.chkpt')
     if os.path.isfile(checkpoint_path):
-        print('LOADED! press enter')
-        input()
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         iteration = checkpoint['iteration'] + 1
@@ -300,7 +298,7 @@ def evaluate():
     adversary_model.eval()
 
     # generate the adversary
-    adversary = adversaries.AdversarialGenerator(adversary_model,criterion)
+    adversary = AdversarialGenerator(adversary_model,criterion)
     
     # evaluate the model 
     input_type = args.model_name.split('_')[0]

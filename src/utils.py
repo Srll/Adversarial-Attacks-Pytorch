@@ -86,8 +86,6 @@ def create_FMA_small_dataset_atlas(directory, force=False):
             pickle.dump(name_to_label, file, pickle.HIGHEST_PROTOCOL)
         
 def create_mnist_dataset_atlas(directory, force=False):
-    
-    
     if not os.path.isfile(os.path.join(directory,'mnist_atlas.pkl')):
         
         paths = {'train': list(), 'validation': list()}
@@ -791,6 +789,8 @@ def get_args_evaluate():
         help = 'number of samples in each batch')
     parser.add_argument('--n_samples_adv', type = int, default = 100,
         help = 'number of adversaries to generate')
+    parser.add_argument('--adv_verbose', dest='adv_verbose', action='store_true',
+        help = 'If flag is present the program will enable verbose adversarial generation')
     parser.add_argument('--gpu', dest='gpu', action='store_true',
         help = 'If flag is present the program will use available CUDA device')
     parser.add_argument('--targeted', dest='targeted', action='store_true',

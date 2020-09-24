@@ -4,3 +4,16 @@ Models/*
 Figures/*
 venv/*
 src/__pycache__/*
+*/__pycache__/*
+src/graphics/*
+src/output/*
+workspace.code-workspace
+testing.py
+src/results.txt
+src/test_mask.py
+src/test.wav
+src/evaluate+adversarial_files.p
+src/temp/*
+src/save/*
+
+
