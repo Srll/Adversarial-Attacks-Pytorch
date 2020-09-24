@@ -15,5 +15,5 @@ src/test.wav
 src/evaluate+adversarial_files.p
 src/temp/*
 src/save/*
-
-
+src/evaluate_adversarial_files.py
+src/00f0204f_nohash_0.wav
