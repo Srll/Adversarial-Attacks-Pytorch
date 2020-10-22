@@ -8,11 +8,11 @@
 * [Evaluate Adversarial Examples](#setup)
 
 ## Project info
-    This is a master thesis project with the goal of exploring the possibility of generating inaudible adversarial perturbations in a black-box setting.
+This is a master thesis project with the goal of exploring the possibility of generating inaudible adversarial perturbations in a black-box setting.
     
-    The MSc thesis publication of the project is available at [Fix this reference]().
+The MSc thesis publication of the project is available at [Fix this reference]().
 
-    A demo of some of the generated adversarial examples are available on this [GitHub page](https://srll.github.io/Adversarial-Attacks-Pytorch/).
+A demo of some of the generated adversarial examples are available on this [GitHub page](https://srll.github.io/Adversarial-Attacks-Pytorch/).
     
 	
 ## Setup
