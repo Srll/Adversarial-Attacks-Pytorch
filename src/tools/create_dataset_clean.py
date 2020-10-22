@@ -1,7 +1,11 @@
 import os
 import shutil
+import sys
 
-with open('predictions.csv', "r") as f:
+relative_path = str(sys.argv[1])
+directory = os.path.join(str(os.getcwd()),relative_path)
+
+with open(os.path.join(directory,'predictions.csv'), "r") as f:
     data = f.readlines()
     mask = [0] * len(data)
     y_list = []
@@ -24,28 +28,28 @@ with open('predictions.csv', "r") as f:
 
 
 
+path_src = directory
+path_dst = os.path.join(str(os.getcwd()),os.path.join("..","Datasets",""))
 
 
-files = os.listdir()
+files = os.listdir(path_src)
 x_names = [x for x in files if 'adv' not in x and 'noise' not in x and 'x' in x and 'wav' in x]
 name_to_label = {'yes':0, 'no':1, 'up':2, 'down':3, 'left':4, 'right':5, 'on':6, 'off':7, 'stop':8, 'go':9}
 label_to_name = {v: k for k, v in name_to_label.items()}
 
-path_src = os.path.abspath(os.getcwd())
-
 targeted = False
 if 'untargeted' in path_src:
     if 'RG' in path_src:
-        path_dst = "C:\\KTH\\EXJOBB\\code\\Adversarial-Attacks-Pytorch\\Datasets\\speech_eval_RG_untargeted_clean"
+        path_dst = os.path.join(path_dst,"speech_eval_RG_untargeted_clean")
     elif 'LG' in path_src:
-        path_dst = "C:\\KTH\\EXJOBB\\code\\Adversarial-Attacks-Pytorch\\Datasets\\speech_eval_LG_untargeted_clean"
+        path_dst = os.path.join(path_dst,"speech_eval_LG_untargeted_clean")
 elif 'targeted' in path_src:
     if 'RG' in path_src:
         targeted = True
-        path_dst = "C:\\KTH\\EXJOBB\\code\\Adversarial-Attacks-Pytorch\\Datasets\\speech_eval_RG_targeted_clean"
+        path_dst = os.path.join(path_dst,"speech_eval_RG_targeted_clean")
     elif 'LG' in path_src:
         targeted = True
-        path_dst = "C:\\KTH\\EXJOBB\\code\\Adversarial-Attacks-Pytorch\\Datasets\\speech_eval_LG_targeted_clean"
+        path_dst = os.path.join(path_dst,"speech_eval_LG_targeted_clean")
 
 
 if os.path.isdir(path_dst):

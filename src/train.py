@@ -82,7 +82,6 @@ def train():
     bar = progressbar.ProgressBar(max_value=n_iterations_show)
     # train the model
     while iteration < n_iterations:
-        print(iteration)
         for _, (inputs,labels) in enumerate(dataloader_train):
             inputs = inputs.type(torch.FloatTensor)
             labels = labels.type(torch.LongTensor)
@@ -142,10 +141,8 @@ def train():
                     accuracy_history.append((accuracy_validation/len(dataloader_validation)).item())
                     accuracy_history.pop(0)
                     
-                    print(accuracy_history)
-                    print(max(accuracy_history))
             model.train()
-            iteration += args.verbose_rate
+            iteration += 1
             
 
 if __name__ == '__main__':
