@@ -5,12 +5,6 @@ from scipy.interpolate import interp1d
 from matplotlib import pyplot as plt
 from scipy.linalg import toeplitz
 
-from graphics import get_audio
-#_, audio = get_audio.get_audio_speech()
-#audio = signal.resample(audio, int(audio.shape[0]*2.75))
-#_, audio = get_audio.get_audio_sin()
-
-
 NEGATIVE_INF = np.NINF
 
 def get_mask_batch(x):
@@ -241,16 +235,7 @@ def get_masking_threshold(x):
         MASK_32[12:29,t_idx] = np.min(np.reshape(MASK_106[72:106],(17,2)), axis=1).copy()
         MASK_32[29:,t_idx] = MASK_106[105].copy()
         
-        
-        #plt.plot(f_steps,P_n)
-        #plt.plot(Fs/2/32*np.linspace(0,32,32),MASK_32[:,t_idx])
-        #plt.plot(f_steps[1:],quiet_threshold(f_steps[1:]))
-        #plt.show()
-
 
     MASK_32[MASK_32 > 96] = 96
     return MASK_32
 
-
-#get_masking_threshold(audio[8000:])
-#get_masking_threshold(audio[8000:])

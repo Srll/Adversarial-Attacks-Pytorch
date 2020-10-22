@@ -5,17 +5,25 @@ import networks
 import progressbar
 from adversaries import AdversarialGenerator
 import os
-import preprocess
+import inaudible.preprocess
 
 
 
 torch.manual_seed(1)
 
 def train():
-    
+    if not os.path.exists(os.path.join( os.getcwd(),'..','Models')):
+        os.mkdir(os.path.join( os.getcwd(),'..','Models')) # make Models dir
+    if not os.path.exists(os.path.join( os.getcwd(),'..','Figures')):
+        os.mkdir(os.path.join( os.getcwd(),'..','Figures')) # make Figures dir
+
     # obtain the arguments 
     args = utils.get_args_train()
 
+    if not os.path.exists(os.path.join( os.getcwd(),'..','Models', args.dataset_name)):
+        os.mkdir(os.path.join( os.getcwd(),'..','Models',args.dataset_name)) # make Models/dataset_name dir
+    
+    
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name
     models_path = args.models_dir + args.dataset_name
@@ -64,7 +72,7 @@ def train():
 
     
     # prepare adversary
-    adversary = adversaries.AdversarialGenerator(model,criterion) 
+    adversary = AdversarialGenerator(model,criterion) 
     
     # stopping criteria
     N_TEST = 5
@@ -74,6 +82,7 @@ def train():
     bar = progressbar.ProgressBar(max_value=n_iterations_show)
     # train the model
     while iteration < n_iterations:
+        print(iteration)
         for _, (inputs,labels) in enumerate(dataloader_train):
             inputs = inputs.type(torch.FloatTensor)
             labels = labels.type(torch.LongTensor)
@@ -136,7 +145,7 @@ def train():
                     print(accuracy_history)
                     print(max(accuracy_history))
             model.train()
-            iteration += 1
+            iteration += args.verbose_rate
             
 
 if __name__ == '__main__':
