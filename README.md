@@ -5,7 +5,7 @@
 * [Project info](#general-info)
 * [Setup](#setup)
 * [Training Classifier](#setup)
-* [Evaluate AEs](#Evaluate AEs)
+* [Evaluate AEs](#Evaluate-AEs)
 
 ## Project info
 This is a master thesis project with the goal of exploring the possibility of generating inaudible adversarial perturbations in a black-box setting.
