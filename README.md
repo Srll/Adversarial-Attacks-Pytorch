@@ -5,7 +5,7 @@
 * [Project info](#general-info)
 * [Setup](#setup)
 * [Training Classifier](#setup)
-* [Evaluate Adversarial Examples](#setup)
+* [Evaluate AEs](#Evaluate AEs)
 
 ## Project info
 This is a master thesis project with the goal of exploring the possibility of generating inaudible adversarial perturbations in a black-box setting.
@@ -67,7 +67,7 @@ There are plenty of other settings available for training the classifiers access
 
     py train.py -h
 
-## Experimental Results
+## Evaluate AEs
 
 ### **Untargeted Attack**
     py evaluate.py --dataset_name speech --model_name audio_F7_base --batch_size 100 --n_samples 100 --adversarial_attack_algorithm LGAP --epsilon 128 --adv_parameters 20 1000 --targeted --gpu
