@@ -85,7 +85,7 @@ In which the adversarial examples are generated using the model **--adversary_mo
 
 
 ### Alternative method:
-**NOTE: This is will not work for experiments other than those in the thesis**
+**NOTE: This will not work for experiments other than those in the thesis**
 
 To evaluate transferability on already existing adversarial examples generated in the targeted/untargeted attacks above, one needs to save the generated adversarial examples from the targeted/untargeted attacks as new datasets. This is more complicated than the transferability evaluation above but was done to during the experimental results in the thesis.
 
@@ -96,12 +96,7 @@ To convert the targeted attack LGAP attack with epsilon 64, run the following co
     py tools/create_dataset_clean.py ..\Figures\speech\audio_F7\LGAP\targeted\64.0\I
 
 
-Once the datasets have been generated one can run
+Once the datasets have been generated one can run the following command in order to evaluate the transferability on the architecture F10
 
-
-    py evaluate.py --model_name audio_F7_base --gpu --targeted --dataset_name speech_eval_LG_targeted_64
-
+    py evaluate.py --model_name audio_F10 --gpu --dataset_name speech_eval_LG_untargeted_64 --batch_size 10 --n_samples_adv 100 --adversarial_attack_algorithm none
     
-    py evaluate.py --model_name audio_F7_base --gpu --targeted --dataset_name speech_eval_LG_targeted_clean
-
-to evaluate the performance on the AEs and the clean signals.
