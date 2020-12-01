@@ -42,15 +42,15 @@ class CNN(torch.nn.Module):
             self.model = torchvision.models.shufflenet_v2_x0_5(pretrained=True)
             self.model.fc = torch.nn.Linear(1024,classes)
         elif self.network_type == 'audio_F7':
-            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess = preprocess.PreProcess(['cast_int16_torch'])
             self.preprocess_bool = True
             self.model = audio_F7(classes, input_length)
         elif self.network_type == 'audio_F7_base':
-            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess = preprocess.PreProcess(['cast_int16_torch'])
             self.preprocess_bool = True
             self.model = audio_F7(classes, input_length)
         elif self.network_type == 'audio_F10':
-            self.preprocess = preprocess.PreProcess(['cast_int16'])
+            self.preprocess = preprocess.PreProcess(['cast_int16_torch'])
             self.preprocess_bool = True
             self.model = audio_F10(classes, input_length)
         
@@ -67,9 +67,9 @@ class CNN(torch.nn.Module):
         self.model.cpu()
         
     def forward(self, x):
-        if self.preprocess_bool == True:
-            x = self.preprocess.forward(x)
-        
+        #if self.preprocess_bool == True:
+        #    x = self.preprocess.forward_torch(x)
+
         if self.GPU_enabled:
             return self.model(x.cuda()).cpu()
         else:

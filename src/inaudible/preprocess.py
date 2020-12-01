@@ -8,8 +8,8 @@ import matplotlib.pyplot as plt
 
 class PreProcess():
     def __init__(self, transforms, **kwargs):
-        # containing all supported preprocessing transforms and their corresponding inverse 
-        
+        # containing all supported preprocessing transforms and their corresponding inverse.
+        self.base_type = torch.float32
         valid_transforms = {None: (self.dummy, self.dummy),
                             'None': (self.dummy, self.dummy),
                             'stft': (self.stft, self.istft),
@@ -26,7 +26,7 @@ class PreProcess():
                             'normalize_batch': (self.normalize_batch, self.inormalize_batch),
                             'resample_to_44100': (self.resample_to_44100, self.iresample_to_44100),
                             'spectrogram_phase': (self.spectrogram_96_phase, self.ispectrogram_96_phase),
-                            'cast_int16': (self.cast_int16, self.dummy),
+                            'cast_int16_torch': (self.torch_cast_int16, self.dummy),
                             'sqrt(8/3)':(self.sqrt_8_3,self.isqrt_8_3)
                             }
 
@@ -35,11 +35,6 @@ class PreProcess():
         #self.kwargs = kwargs
 
         self.fs = 16000
-        
-        # TODO make it possible to specify these through CLI
-        self.kwargs =  {'coeffs_denominator' : signal.butter(6,5000,btype='low',fs=16000)[1],
-                        'coeffs_numerator' : signal.butter(6,5000,btype='low',fs=16000)[0], 
-                        'max_value':100000}
         self.stft_n_fft = 32
                         
 
@@ -51,16 +46,21 @@ class PreProcess():
 
         self.transforms_forward = list()
         self.transforms_inverse = list()
+        
         for transform in transforms:
-            self.transforms_forward.append(valid_transforms[transform][0]) # add all forward transforms to forward list
+            self.transforms_forward.append(valid_transforms[transform][0]) # add all forward transforms to forward list    
             self.transforms_inverse.append(valid_transforms[transform][1]) # add their corresponding "inverse" to inverse list
+            
         self.transforms_inverse.reverse() 
 
+    def forward_torch(self,x):
+        for t in self.transforms_forward:
+            x = t(x)
+        return x
 
     def forward(self, x):
         if torch.is_tensor(x):
             x = x.numpy()
-        
         for t in self.transforms_forward:
             x = t(x)
         try:
@@ -112,8 +112,9 @@ class PreProcess():
     def dummy(self, x):
         return x
 
-    def cast_int16(self, x):
-        return x.astype(np.int16)
+
+    def torch_cast_int16(self, x):
+        return x.type(torch.int16)
 
             
     def mag2db96(self,x):

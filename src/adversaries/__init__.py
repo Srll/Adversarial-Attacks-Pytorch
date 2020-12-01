@@ -22,8 +22,9 @@ class AdversarialGenerator(object):
             if adversarial_type == 'none':
                 return x
             elif adversarial_type == 'FGSM_vanilla':
-                self.adversarial_preprocess = preprocess.PreProcess('none')
                 x_adv = self.generate_adversarial_FGSM_vanilla(x, target, targeted, eps, x_min, x_max, train)
+            elif adversarial_type == 'FGSM_masking':
+                x_adv = self.generate_adversarial_FGSM_masking(x, target, targeted, eps, x_min, x_max, train)
             elif adversarial_type == 'PGD':
                 self.adversarial_preprocess = preprocess.PreProcess('none')
                 x_adv = self.generate_adversarial_PGD(x, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
@@ -52,6 +53,8 @@ class AdversarialGenerator(object):
                 return x, torch.zeros_like(x), y_estimate,y_estimate
             elif adversarial_type == 'FGSM_vanilla':
                 x_adv, x_delta, y_estimate_adv, y_estimate = self.generate_adversarial_FGSM_vanilla(x, target, targeted, eps, x_min, x_max, train)
+            elif adversarial_type == 'FGSM_masking':
+                x_adv, x_delta, y_estimate_adv, y_estimate = self.generate_adversarial_FGSM_masking(x, target, targeted, eps, x_min, x_max, train)
             elif adversarial_type == 'PGD':
                 x_adv, x_delta, y_estimate_adv, y_estimate =  self.generate_adversarial_PGD(x, target, targeted, eps, x_min, x_max, alpha, n_steps, train)
             elif adversarial_type == 'ONE_PIXEL':
@@ -84,6 +87,7 @@ class AdversarialGenerator(object):
     from ._LGAP import generate_adversarial_LGAP
     from ._ONE_PIXEL import generate_adversarial_ONE_PIXEL
     from ._FGSM_vanilla import generate_adversarial_FGSM_vanilla
+    from ._FGSM_masking import generate_adversarial_FGSM_masking
     from ._PGD import generate_adversarial_PGD
     from ._DE_MASKING import generate_adversarial_DE_MASKING
 

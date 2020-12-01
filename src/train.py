@@ -5,25 +5,17 @@ import networks
 import progressbar
 from adversaries import AdversarialGenerator
 import os
-import inaudible.preprocess
+from inaudible import preprocess
 
 
 
 torch.manual_seed(1)
 
 def train():
-    if not os.path.exists(os.path.join( os.getcwd(),'..','Models')):
-        os.mkdir(os.path.join( os.getcwd(),'..','Models')) # make Models dir
-    if not os.path.exists(os.path.join( os.getcwd(),'..','Figures')):
-        os.mkdir(os.path.join( os.getcwd(),'..','Figures')) # make Figures dir
-
+    
     # obtain the arguments 
     args = utils.get_args_train()
 
-    if not os.path.exists(os.path.join( os.getcwd(),'..','Models', args.dataset_name)):
-        os.mkdir(os.path.join( os.getcwd(),'..','Models',args.dataset_name)) # make Models/dataset_name dir
-    
-    
     # obtain the model and the datasets
     dataset_path = args.datasets_dir + args.dataset_name
     models_path = args.models_dir + args.dataset_name
@@ -141,6 +133,8 @@ def train():
                     accuracy_history.append((accuracy_validation/len(dataloader_validation)).item())
                     accuracy_history.pop(0)
                     
+                    print(accuracy_history)
+                    print(max(accuracy_history))
             model.train()
             iteration += 1
             

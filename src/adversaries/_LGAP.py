@@ -5,7 +5,6 @@ from matplotlib import pyplot as plt
 from scipy import signal
 import pickle
 import os.path
-import progressbar
 
 def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1, verbose=False, adv_parameters=[20,1000]):
     # adv_parameters = [N_iterations, N_perturbations]
@@ -70,6 +69,7 @@ def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1, verbose=False, a
         plt.ion()
     
     def add_pixels(z, pixels, active):
+        
         z_perturbed = z.copy()
         z_perturbed[pixels[:,:,0],pixels[:,:,1],pixels[:,:,2],pixels[:,:,3]] = mag2db(np.abs(db2mag(z_perturbed[pixels[:,:,0],pixels[:,:,1],pixels[:,:,2],pixels[:,:,3]]) + pixels[:,:,4] * m_2d_mag[pixels[:,:,0],pixels[:,:,2],pixels[:,:,3]]))
         return z_perturbed[active]
@@ -101,7 +101,7 @@ def generate_adversarial_LGAP(self,x, y, targeted=False, eps=1, verbose=False, a
 
 
     # main optimization loops
-    for i in progressbar.progressbar(range(n_start, N_loops), redirect_stdout=True):
+    for i in range(n_start, N_loops):
         # pixels neighbor f, t, neighbor_number, (batch, 0, x, y, specific_eps)
         pickle.dump(i, open(os.path.join('save','LG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted)+'_n'+'.pickle'),"wb"))
         pickle.dump(pixels, open(os.path.join('save','LG_N'+str(F_RESOLUTION)+'_'+str(int(eps))+str(targeted)+'_pixels'+'.pickle'),"wb"))

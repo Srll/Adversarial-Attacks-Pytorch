@@ -227,17 +227,17 @@ def save_audio(x, adv_noise, x_adv, y, y_est, y_est_adv, path, target_name=None)
     x2 = pre.forward(x_adv)[0].numpy()
     x3 = x1 - x2
     #Rescale to 0-255 and convert to uint8
-    #x1_r = (255.0 / x1.max() * (x1 - x1.min())).astype(np.uint8)
-    #x2_r = (255.0 / x1.max() * (x2 - x1.min())).astype(np.uint8)
-    #x3_r = (255.0 / x1.max() * (x3 - x1.min())).astype(np.uint8)
+    x1_r = (255.0 / x1.max() * (x1 - x1.min())).astype(np.uint8)
+    x2_r = (255.0 / x1.max() * (x2 - x1.min())).astype(np.uint8)
+    x3_r = (255.0 / x1.max() * (x3 - x1.min())).astype(np.uint8)
     
     
-    #im1 = Image.fromarray(x1_r.T)
-    #im2 = Image.fromarray(x2_r.T)
-    #im3 = Image.fromarray(x3_r.T)
-    #im1.save('x.png')
-    #im2.save('x_adv.png')
-    #im3.save('x_adv_noise.png')
+    im1 = Image.fromarray(x1_r.T)
+    im2 = Image.fromarray(x2_r.T)
+    im3 = Image.fromarray(x3_r.T)
+    im1.save('x.png')
+    im2.save('x_adv.png')
+    im3.save('x_adv_noise.png')
     
     
     

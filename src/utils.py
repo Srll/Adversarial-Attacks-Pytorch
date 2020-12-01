@@ -381,7 +381,7 @@ def get_args_train():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'LGAP','RGAP'
+            'none', 'FGSM_vanilla', 'FGSM_masking', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking', 'LGAP','RGAP'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
@@ -439,12 +439,12 @@ def get_args_evaluate():
 
     # Adversarial training parsing 
     parser.add_argument('--adversarial_training_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','LGAP','RGAP'
+            'none', 'FGSM_vanilla','FGSM_masking', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','LGAP','RGAP'
         ], default = 'none',
         help = 'adversarial training algorithm for the experiments')
     # Adversarial attack parsing 
     parser.add_argument('--adversarial_attack_algorithm', choices = [
-            'none', 'FGSM_vanilla', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','LGAP','RGAP'
+            'none', 'FGSM_vanilla', 'FGSM_masking', 'PGD', 'fast', 'free','ONE_PIXEL','DE','DE_masking','LGAP','RGAP'
         ], default = 'FGSM_vanilla',
         help = 'adversarial attack algorithm for the experiments')
     parser.add_argument('--epsilon', type = float, default = 0.03, 
