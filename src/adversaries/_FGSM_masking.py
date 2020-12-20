@@ -19,13 +19,17 @@ def generate_adversarial_FGSM_masking(self, x, y, targeted=False, eps = 0.03, x_
         max_save = torch.max(z2,dim=1,keepdim=True)[0]
         z3 = 96 + z2 - max_save
 
+
         m = masking.get_mask_batch(signal.resample(x.numpy(), int(x.shape[1] * (44100/16000)), axis=1))
         m_ = m[:,:int(np.ceil(m.shape[1]/2.75))]
         m__ = signal.resample(m_, z3.shape[1], axis=1)
         mask = signal.resample(m__, z3.shape[2], axis=2)
         mask_torch = torch.tensor(mask)
 
-        z3_adv = torch.autograd.Variable(z3.data, requires_grad=True)
+        z3_mag = db2mag(z3)
+        z3_adv_mag = torch.autograd.Variable(z3_mag.data, requires_grad=True)
+        
+        z3_adv = mag2db(z3_adv_mag)
         # do all inverse transforms
         z2_adv = z3_adv - 96 + max_save
         z1_adv = torch.pow(10, z2_adv/10)
@@ -45,12 +49,33 @@ def generate_adversarial_FGSM_masking(self, x, y, targeted=False, eps = 0.03, x_
         if z3_adv.grad is not None:
             z3_adv.grad.data.fill_(0.0)
         loss.backward()
+        #U = z3_adv.shape[1]*z3_adv.shape[2]
+        #U = 1402
+        #U = 1270
+        #U = 1015
 
-        noise = mask_torch * z3_adv.grad.sign()
-        #import pdb; pdb.set_trace()
-        z3_adv = mag2db(db2mag(z3_adv) - 128*db2mag(noise))
+        U = 10999
+        #U = 1750
+        
+        
+        z_grad = z3_adv_mag.grad
+        z_grad_flat = torch.reshape(z_grad, (z_grad.shape[0],z_grad.shape[1]*z_grad.shape[2]))
+        z_grad_flat_abs = torch.abs(z_grad_flat)
+        z_grad_flat_sign = z_grad_flat.sign()
+        sort_flat_abs, idxs_flat_abs = z_grad_flat_abs.sort()
+        idxs = idxs_flat_abs[:,-U:]
+        
+        mask_torch_flat = torch.reshape(mask_torch, (z_grad.shape[0],z_grad.shape[1]*z_grad.shape[2]))
+        noise_flat = torch.zeros_like(mask_torch_flat)
+        for i in range(z_grad.shape[0]):
+            for u in range(U):
+                noise_flat[i,idxs[i,u]] = db2mag(mask_torch_flat[i,idxs[i,u]]) * z_grad_flat_sign[i,idxs[i,u]]
+        
+        noise = torch.reshape(noise_flat, (z_grad.shape[0],z_grad.shape[1],z_grad.shape[2]))
+        z3_adv_noise = mag2db(db2mag(z3_adv) + eps*noise)
+        #z3_adv = mag2db(db2mag(z3_adv))
 
-        z2_adv = z3_adv - 96 + max_save
+        z2_adv = z3_adv_noise - 96 + max_save
         z1_adv = torch.pow(10, z2_adv/10)
         
         z_real = z1_adv * torch.sin(z_phase)
@@ -58,6 +83,7 @@ def generate_adversarial_FGSM_masking(self, x, y, targeted=False, eps = 0.03, x_
         z_adv = torch.stack([z_real, z_imag],dim=-1)
         x_adv = torch.istft(z_adv, 64, 32)
         x_adv = (x_adv.type(torch.int16)).type(torch.float32)
+        
         if train:
             return x_adv 
 
